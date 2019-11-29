@@ -7,30 +7,34 @@ export const SearchBar = (props) => {
 
     const { query, ignoreCase, files, repos, allRepos, stats, onSearchRequested } = props;
     const [ showAdvanced, setShowAdvanced] = useState(false);
-    const [ search, setSearch ] = useState({ query, ignoreCase, files, repos } );
+    const [ searchQuery, setSearchQuery ] = useState(query);
+    const [ searchIgnoreCase, setSearchIgnoreCase ] = useState(ignoreCase);
+    const [ searchFiles, setSearchFiles ] = useState(files);
+    const [ searchRepos, setSearchRepos ] = useState(repos);
     const queryInput = useRef(null);
     const fileInput = useRef(null);
 
     const hasAdvancedValues = () => (
-        ( search.files && search.files.trim() !== '' ) ||
-        ( search.ignoreCase && search.ignoreCase.trim() === 'fosho' ) ||
-        ( search.repos && search.repos.length > 0 )
+        ( searchFiles && searchFiles.trim() !== '' ) ||
+        ( searchIgnoreCase && searchIgnoreCase.trim() === 'fosho' ) ||
+        ( searchRepos && searchRepos.length > 0 )
     );
 
-    useEffect( () => {
-        setSearch({ query, files, repos, ignoreCase });
-    }, [query, files, repos, ignoreCase]);
+    useEffect(() => { setSearchQuery(query) }, [query]);
+    useEffect(() => { setSearchIgnoreCase(ignoreCase) }, [ignoreCase]);
+    useEffect(() => { setSearchFiles(files) }, [files]);
+    useEffect(() => { setSearchRepos(repos) }, [repos]);
 
     const repoOptions = allRepos.map(rname => ({
         value: rname,
         label: rname
     }));
 
-    const selectedRepos = repoOptions.filter(o => search.repos.indexOf(o.value) >= 0);
+    const selectedRepos = repoOptions.filter(o => searchRepos.indexOf(o.value) >= 0);
 
     const showAdvancedCallback = () => {
         setShowAdvanced(true);
-        if (search.query.trim() !== '') {
+        if (searchQuery.trim() !== '') {
             fileInput.current.focus();
         }
     };
@@ -42,24 +46,29 @@ export const SearchBar = (props) => {
         }
     };
 
-    const elementChanged = (prop, checkbox, evt) => {
-        setSearch({
-            ...search,
-            [prop]: checkbox
-                ? evt.currentTarget.checked && 'fosho' || 'nope'
-                : evt.currentTarget.value
-        });
+    const elementChanged = (prop, evt) => {
+        switch (prop) {
+            case 'query':
+                setSearchQuery(evt.currentTarget.value);
+                break;
+            case 'files':
+                setSearchFiles(evt.currentTarget.value);
+                break;
+            case 'ignoreCase':
+                setSearchIgnoreCase(evt.currentTarget.checked && 'fosho' || 'nope');
+                break;
+        }
     };
 
     const submitQuery = () => {
-        if (search.query.trim() !== '') {
+        if (searchQuery.trim() !== '') {
             onSearchRequested({
-                q: search.query,
-                i: search.ignoreCase,
-                files: search.files,
-                repos: Model.ValidRepos(search.repos) === Model.RepoCount()
+                q: searchQuery,
+                i: searchIgnoreCase,
+                files: searchFiles,
+                repos: Model.ValidRepos(searchRepos) === Model.RepoCount()
                     ? ''
-                    : search.repos.join(',')
+                    : searchRepos.join(',')
             });
         }
     };
@@ -89,7 +98,7 @@ export const SearchBar = (props) => {
         switch (event.keyCode) {
             case 38:
                 // if advanced is empty, close it up.
-                if (search.files.trim() === '') {
+                if (searchFiles.trim() === '') {
                     hideAdvancedCallback();
                 }
                 queryInput.current.focus();
@@ -101,12 +110,11 @@ export const SearchBar = (props) => {
     };
 
     const repoSelected = (selected) => {
-        setSearch({
-            ...search,
-            repos: selected
+        setSearchRepos(
+            selected
                 ? selected.map(item => item.value)
                 : []
-        });
+        );
     };
 
     const statsView = stats
@@ -136,9 +144,9 @@ export const SearchBar = (props) => {
                     placeholder="Search by Regexp"
                     autoComplete="off"
                     autoFocus
-                    value={ search.query }
+                    value={ searchQuery }
                     onFocus={ queryGotFocus }
-                    onChange={ elementChanged.bind(this, "query", false) }
+                    onChange={ elementChanged.bind(this, "query") }
                     onKeyDown={ queryGotKeydown }
                 />
                 <div className="button-add-on">
@@ -156,8 +164,8 @@ export const SearchBar = (props) => {
                                 ref={ fileInput }
                                 type="text"
                                 placeholder="regexp"
-                                value={ search.files }
-                                onChange={ elementChanged.bind(this, "files", false) }
+                                value={ searchFiles }
+                                onChange={ elementChanged.bind(this, "files") }
                                 onKeyDown={ filesGotKeydown }
                             />
                         </div>
@@ -165,7 +173,7 @@ export const SearchBar = (props) => {
                     <div className="field">
                         <label htmlFor="ignore-case">Ignore Case</label>
                         <div className="field-input">
-                            <input type="checkbox" onChange={ elementChanged.bind(this, "ignoreCase", true) } checked={ ParamValueToBool(search.ignoreCase) } />
+                            <input type="checkbox" onChange={ elementChanged.bind(this, "ignoreCase") } checked={ ParamValueToBool(searchIgnoreCase) } />
                         </div>
                     </div>
                     <div className="field-repo-select">
