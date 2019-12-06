@@ -8,7 +8,7 @@ resource_types:
 resources:
 - name: pr
   type: pull-request
-  #check_every: 24h
+  check_every: 24h
   webhook_token: ((webhook-token))
   source:
     repository: it-projects-llc/hound
