@@ -1,0 +1,31 @@
+name: Release
+on:
+  release:
+    types: [ created ]
+
+jobs:
+  deploy:
+    steps:
+    - name: Start deployment
+      uses: bobheadxi/deployments@v0.2.0
+      id: deployment
+      with:
+        step: start
+        token: ${{ secrets.GITHUB_TOKEN }}
+        env: release
+
+    - name: Deploy
+      run: |
+        OUTPUT=$(curl -i ${{ secrets.DEPLOYMENT_WEBHOOK }})
+        echo $OUTPUT
+        STATUSCODE=$(echo $OUTPUT| grep HTTP/1.1 | awk {'print $2'})
+        test $STATUSCODE -ne 200 && exit $STATUSCODE
+    - name: Deployment status
+      uses: bobheadxi/deployments@v0.2.0
+      if: always()
+      with:
+        step: finish
+        token: ${{ secrets.GITHUB_TOKEN }}
+        status: ${{ job.status }}
+        deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+        env_url: https://odoo-source.com/
