@@ -150,6 +150,8 @@ Then run the hound server with the --dev option:
 bin/houndd --dev
 ```
 
+Note: to make it work, port `9000` should be free.
+
 ## Credits
 
 Created at [Etsy](https://www.etsy.com) by:
