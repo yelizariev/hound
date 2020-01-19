@@ -10,6 +10,7 @@ export const App = function (props) {
     const [ query, setQuery ] = useState('');
     const [ ignoreCase, setIgnoreCase ] = useState('nope');
     const [ files, setFiles ] = useState('');
+    const [ excludeFiles, setExcludeFiles ] = useState('');
     const [ repos, setRepos ] = useState([]);
     const [ allRepos, setAllRepos ] = useState([]);
     const [ stats, setStats ] = useState('');
@@ -22,6 +23,7 @@ export const App = function (props) {
         setQuery(urlParams.q);
         setIgnoreCase(urlParams.i);
         setFiles(urlParams.files);
+        setExcludeFiles(urlParams.excludeFiles);
         setRepos(
             (urlParams.repos === '') ? [] : urlParams.repos.split(',')
         );
@@ -55,6 +57,7 @@ export const App = function (props) {
             if ( urlParams.q !== query ) { setQuery(urlParams.q); }
             if ( urlParams.i !== ignoreCase ) { setIgnoreCase(urlParams.i) }
             if ( urlParams.files !== files ) { setFiles(urlParams.files) }
+            if ( urlParams.excludeFiles !== excludeFiles ) { setExcludeFiles(urlParams.excludeFiles) }
             setRepos( (urlParams.repos === '') ? [] : urlParams.repos.split(',') );
             Model.Search(urlParams);
         });
@@ -66,6 +69,7 @@ export const App = function (props) {
             + `?q=${ encodeURIComponent(params.q) }`
             + `&i=${ encodeURIComponent(params.i) }`
             + `&files=${ encodeURIComponent(params.files) }`
+            + `&excludeFiles=${ encodeURIComponent(params.excludeFiles) }`
             + `&repos=${ params.repos }`;
         history.pushState({ path: path }, '', path);
     };
@@ -75,6 +79,7 @@ export const App = function (props) {
         if ( params.q !== query ) { setQuery(params.q); }
         if ( params.i !== ignoreCase ) { setIgnoreCase(params.i) }
         if ( params.files !== files ) { setFiles(params.files) }
+        if ( params.excludeFiles !== excludeFiles ) { setExcludeFiles(params.excludeFiles) }
         setResults(null);
         Model.Search(params);
     };
@@ -85,6 +90,7 @@ export const App = function (props) {
                 query={ query }
                 ignoreCase={ ignoreCase }
                 files={ files }
+                excludeFiles={ excludeFiles }
                 repos={ repos }
                 allRepos={ allRepos }
                 stats={ stats }

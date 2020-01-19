@@ -5,17 +5,20 @@ import Select from 'react-select';
 
 export const SearchBar = (props) => {
 
-    const { query, ignoreCase, files, repos, allRepos, stats, onSearchRequested } = props;
+    const { query, ignoreCase, files, excludeFiles, repos, allRepos, stats, onSearchRequested } = props;
     const [ showAdvanced, setShowAdvanced] = useState(false);
     const [ searchQuery, setSearchQuery ] = useState(query);
     const [ searchIgnoreCase, setSearchIgnoreCase ] = useState(ignoreCase);
     const [ searchFiles, setSearchFiles ] = useState(files);
+    const [ searchExcludeFiles, setSearchExcludeFiles ] = useState(excludeFiles);
     const [ searchRepos, setSearchRepos ] = useState(repos);
     const queryInput = useRef(null);
     const fileInput = useRef(null);
+    //const excludeFileInput = useRef(null);
 
     const hasAdvancedValues = () => (
         ( searchFiles && searchFiles.trim() !== '' ) ||
+        ( searchExcludeFiles && searchExcludeFiles.trim() !== '' ) ||
         ( searchIgnoreCase && searchIgnoreCase.trim() === 'fosho' ) ||
         ( searchRepos && searchRepos.length > 0 )
     );
@@ -23,6 +26,7 @@ export const SearchBar = (props) => {
     useEffect(() => { setSearchQuery(query) }, [query]);
     useEffect(() => { setSearchIgnoreCase(ignoreCase) }, [ignoreCase]);
     useEffect(() => { setSearchFiles(files) }, [files]);
+    useEffect(() => { setSearchExcludeFiles(excludeFiles) }, [excludeFiles]);
     useEffect(() => { setSearchRepos(repos) }, [repos]);
 
     const repoOptions = allRepos.map(rname => ({
@@ -47,12 +51,16 @@ export const SearchBar = (props) => {
     };
 
     const elementChanged = (prop, evt) => {
+        console.log('elementChanged', prop, evt.currentTarget.value);
         switch (prop) {
             case 'query':
                 setSearchQuery(evt.currentTarget.value);
                 break;
             case 'files':
                 setSearchFiles(evt.currentTarget.value);
+                break;
+            case 'excludeFiles':
+                setSearchExcludeFiles(evt.currentTarget.value);
                 break;
             case 'ignoreCase':
                 setSearchIgnoreCase(evt.currentTarget.checked && 'fosho' || 'nope');
@@ -61,11 +69,13 @@ export const SearchBar = (props) => {
     };
 
     const submitQuery = () => {
+        console.log('submitQuery', searchExcludeFiles);
         if (searchQuery.trim() !== '') {
             onSearchRequested({
                 q: searchQuery,
                 i: searchIgnoreCase,
                 files: searchFiles,
+                excludeFiles: searchExcludeFiles,
                 repos: Model.ValidRepos(searchRepos) === Model.RepoCount()
                     ? ''
                     : searchRepos.join(',')
@@ -99,6 +109,21 @@ export const SearchBar = (props) => {
             case 38:
                 // if advanced is empty, close it up.
                 if (searchFiles.trim() === '') {
+                    hideAdvancedCallback();
+                }
+                queryInput.current.focus();
+                break;
+            case 13:
+                submitQuery();
+                break;
+        }
+    };
+
+    const excludeFilesGotKeydown = (event) => {
+        switch (event.keyCode) {
+            case 38:
+                // if advanced is empty, close it up.
+                if (searchExcludeFiles.trim() === '') {
                     hideAdvancedCallback();
                 }
                 queryInput.current.focus();
@@ -167,6 +192,18 @@ export const SearchBar = (props) => {
                                 value={ searchFiles }
                                 onChange={ elementChanged.bind(this, "files") }
                                 onKeyDown={ filesGotKeydown }
+                            />
+                        </div>
+                    </div>
+                    <div className="field">
+                        <label htmlFor="excludeFiles">Exclude File Path</label>
+                        <div className="field-input">
+                            <input
+                                type="text"
+                                placeholder="regexp"
+                                value={ searchExcludeFiles }
+                                onChange={ elementChanged.bind(this, "excludeFiles") }
+                                onKeyDown={ excludeFilesGotKeydown }
                             />
                         </div>
                     </div>
