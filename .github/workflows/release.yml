@@ -20,7 +20,7 @@ jobs:
         OUTPUT=$(curl -i ${{ secrets.DEPLOYMENT_WEBHOOK }})
         echo $OUTPUT
         STATUSCODE=$(echo $OUTPUT| grep HTTP/1.1 | awk {'print $2'})
-        test $STATUSCODE -ne 200 && exit $STATUSCODE
+        test $STATUSCODE -ne 200 && exit $STATUSCODE || exit 0
     - name: Deployment status
       uses: bobheadxi/deployments@v0.2.0
       if: always()
