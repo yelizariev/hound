@@ -4,7 +4,7 @@ CD consists of the following steps:
 
 * Some updates are pushed to master branch
 * Github Actions [rebuild images](../.github/workflows/main.yml)
-* New draft release is created on github **manually**
+* New prerelease is created on github **manually**
 * Github Actions [sends webhooks](../.github/workflows/release.yml) to [WSGI Application](#wsgi-application)
 * WSGI App [fetches new docker image and recreate the docker container](deploy.example.sh)
 * Deployment is checked **manually**
