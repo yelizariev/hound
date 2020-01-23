@@ -30,7 +30,14 @@ export const ParamsFromQueryString = (qs, params = {}) => {
     return params;
 };
 
-export const ParamsFromUrl = (params = { q: '', i: 'nope', files: '', repos: '*' }) => ParamsFromQueryString(location.search, params);
+export const ParamsFromUrl = (
+    params = {
+        q: '',
+        i: 'nope',
+        files: '',
+        excludeFiles: '',
+        repos: '*'
+    }) => ParamsFromQueryString(location.search, params);
 
 export const ParamValueToBool = (v) => {
     v = v.toLowerCase();

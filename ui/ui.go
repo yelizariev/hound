@@ -91,7 +91,8 @@ func renderForDev(w io.Writer, root string, c *content, cfg *config.Config, r *h
 
 	var buf bytes.Buffer
 	for _, path := range c.sources {
-		fmt.Fprintf(&buf, "<script src=\"http://localhost:8080/ui/%s\"></script>", path)
+		// TODO: Use port from webpack.config.js -> devServer.port
+		fmt.Fprintf(&buf, "<script src=\"http://localhost:9000/ui/%s\"></script>", path)
 	}
 
 	return c.tpl.Execute(w, map[string]interface{}{

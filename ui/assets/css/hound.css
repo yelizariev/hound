@@ -123,7 +123,7 @@ button:focus {
 /* Media object clearfix */
 #adv > .field > label,
 #adv > .field-repo-select > label {
-  width: 90px;
+  width: 100px;
   color: #999;
 }
 

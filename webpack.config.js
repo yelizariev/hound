@@ -1,6 +1,9 @@
 const path = require('path');
 
 module.exports = {
+    devServer: {
+        port: 9000,
+    },
     entry: {
         'ui/js/hound.js': './ui/assets/js/hound.jsx',
         'ui/js/excluded_files.js': './ui/assets/js/excluded_files.jsx',

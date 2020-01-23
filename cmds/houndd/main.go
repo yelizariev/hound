@@ -153,7 +153,7 @@ func main() {
 	}
 
 	if *flagDev {
-		info_log.Printf("[DEV] starting webpack-dev-server at localhost:8080...")
+		info_log.Printf("[DEV] starting webpack-dev-server at localhost:9000...")
 		webpack := exec.Command("./node_modules/.bin/webpack-dev-server", "--mode", "development")
 		webpack.Dir = basepath + "/../../"
 		webpack.Stdout = os.Stdout
