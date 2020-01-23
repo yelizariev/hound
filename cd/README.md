@@ -25,7 +25,7 @@ docker login docker.pkg.github.com -u GITHUB_USERNAME -p GITHUB_TOKEN
 * Deploy WSGI App:
 
 ```sh
-uwsgi --http :9090 --wsgi-file deploy-uwsgi.py > hound.logs &
+uwsgi --http :9090 --wsgi-file deploy-uwsgi.py  &> hound.logs &
 ```
 
 * [Create secret](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/creating-and-using-encrypted-secrets#creating-encrypted-secrets) `DEPLOYMENT_WEBHOOK` with the url to your WSGI App
