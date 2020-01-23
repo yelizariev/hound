@@ -18,7 +18,7 @@ jobs:
     - name: Deploy
       run: |
         OUTPUT=$(curl -i ${{ secrets.DEPLOYMENT_WEBHOOK }})
-        echo $OUTPUT
+        echo "$OUTPUT"
         STATUSCODE=$(echo $OUTPUT| grep HTTP/1.1 | awk {'print $2'})
         test $STATUSCODE -ne 200 && exit $STATUSCODE || exit 0
     - name: Deployment status
