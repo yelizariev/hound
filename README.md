@@ -8,6 +8,8 @@ Hound is an extremely fast source code search engine. The core is based on this 
 
 ![Hound Screen Capture](screen_capture.gif)
 
+Live demo: https://odoo-source.com/
+
 ## Quick Start Guide
 
 ### Using Go Tools
