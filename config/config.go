@@ -15,7 +15,7 @@ const (
 	defaultVcs                   = "git"
 	defaultBaseUrl               = "{url}/blob/{rev}/{path}{anchor}"
 	defaultAnchor                = "#L{line}"
-	defaultHealthChekURI         = "/healthz"
+	defaultHealthCheckURI        = "/healthz"
 )
 
 type UrlPattern struct {
@@ -127,7 +127,7 @@ func initConfig(c *Config) {
 	}
 
 	if c.HealthCheckURI == "" {
-		c.HealthCheckURI = defaultHealthChekURI
+		c.HealthCheckURI = defaultHealthCheckURI
 	}
 }
 
