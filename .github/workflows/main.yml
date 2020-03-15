@@ -17,8 +17,8 @@ jobs:
     - uses: actions/checkout@v1
     - name: make
       run: |
-        mkdir -p $(go env GOPATH)/src/github.com/it-projects-llc/
-        ln -s $(pwd) $(go env GOPATH)/src/github.com/it-projects-llc/hound
+        mkdir -p $(go env GOPATH)/src/github.com/itpp-labs/
+        ln -s $(pwd) $(go env GOPATH)/src/github.com/itpp-labs/hound
         make
     # Commiting updates from Github Actions doesn't trigger the action again, so
     # next steps will not be executed twice
@@ -37,7 +37,7 @@ jobs:
       env:
         DEV: yes
       with:
-        name: it-projects-llc/hound/dev
+        name: itpp-labs/hound/dev
         registry: docker.pkg.github.com
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -45,7 +45,7 @@ jobs:
     - name: Build and publish Production Docker Image
       uses: elgohr/Publish-Docker-Github-Action@master
       with:
-        name: it-projects-llc/hound/production
+        name: itpp-labs/hound/production
         registry: docker.pkg.github.com
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

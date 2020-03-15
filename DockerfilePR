@@ -1,6 +1,6 @@
 # it's used in concourse.yml
-FROM docker.pkg.github.com/it-projects-llc/hound/dev
+FROM docker.pkg.github.com/itpp-labs/hound/dev
 
-COPY . /go/src/github.com/it-projects-llc/hound
+COPY . /go/src/github.com/itpp-labs/hound
 
-RUN make -C /go/src/github.com/it-projects-llc/hound
+RUN make -C /go/src/github.com/itpp-labs/hound

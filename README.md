@@ -1,6 +1,6 @@
 # Hound
 
-[![Build Status](https://travis-ci.org/it-projects-llc/hound.svg?branch=master)](https://travis-ci.org/it-projects-llc/hound) 
+[![Build Status](https://travis-ci.org/itpp-labs/hound.svg?branch=master)](https://travis-ci.org/itpp-labs/hound) 
 
 Hound is an extremely fast source code search engine. The core is based on this article (and code) from Russ Cox:
 [Regular Expression Matching with a Trigram Index](http://swtch.com/~rsc/regexp/regexp4.html). Hound itself is a static
@@ -17,7 +17,7 @@ Live demo: https://odoo-source.com/
 1. Use the Go tools to install Hound. The binaries `houndd` (server) and `hound` (cli) will be installed in your $GOPATH.
 
 ```
-go get github.com/it-projects-llc/hound/cmds/...
+go get github.com/itpp-labs/hound/cmds/...
 ```
 
 2. Create a [config.json](config-example.json) in a directory with your list of repositories.
@@ -40,7 +40,7 @@ go get github.com/it-projects-llc/hound/cmds/...
 
 2. Run 
 
-       docker run -d -p 6080:6080 --name hound -v $(pwd):/data docker.pkg.github.com/it-projects-llc/hound/production
+       docker run -d -p 6080:6080 --name hound -v $(pwd):/data docker.pkg.github.com/itpp-labs/hound/production
 
 
 You should be able to navigate to [http://localhost:6080/](http://localhost:6080/) as usual.
@@ -109,15 +109,15 @@ Go tools work accordingly. See [Setting GOPATH](https://github.com/golang/go/wik
 up your Go workspace. With a `GOPATH` set, the following commands will build hound locally.
 
 ```
-git clone https://github.com/it-projects-llc/hound.git ${GOPATH}/src/github.com/it-projects-llc/hound
-cd ${GOPATH}/src/github.com/it-projects-llc/hound
+git clone https://github.com/itpp-labs/hound.git ${GOPATH}/src/github.com/itpp-labs/hound
+cd ${GOPATH}/src/github.com/itpp-labs/hound
 make
 ```
 
 If this is your only Go project, you can set your GOPATH just for Hound:
 ```
-git clone https://github.com/it-projects-llc/hound.git src/github.com/it-projects-llc/hound
-GOPATH=$(pwd) make -C src/github.com/it-projects-llc/hound
+git clone https://github.com/itpp-labs/hound.git src/github.com/itpp-labs/hound
+GOPATH=$(pwd) make -C src/github.com/itpp-labs/hound
 ```
 
 ### Testing
@@ -161,4 +161,5 @@ Created at [Etsy](https://www.etsy.com) by:
 * [Kelly Norton](https://github.com/kellegous)
 * [Jonathan Klein](https://github.com/jklein)
 
-Maintained by [IT-Projects LLC](https://www.it-projects.info/team/).
+Maintained by [IT Projects Labs](https://itpp.dev/).
+

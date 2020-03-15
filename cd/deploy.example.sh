@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-DOCKER=docker.pkg.github.com/it-projects-llc/hound/production
+DOCKER=docker.pkg.github.com/itpp-labs/hound/production
 NAME=hound
 DATA=$(pwd)
 docker pull $DOCKER

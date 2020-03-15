@@ -11,13 +11,13 @@ resources:
   check_every: 24h
   webhook_token: ((webhook-token))
   source:
-    repository: it-projects-llc/hound
+    repository: itpp-labs/hound
     access_token: ((github-token))
 
 - name: docker-registry
   type: docker-image
   source:
-    repository: docker.pkg.github.com/it-projects-llc/hound/pr
+    repository: docker.pkg.github.com/itpp-labs/hound/pr
     username: ((github-username))
     password: ((github-token))
 
@@ -55,7 +55,7 @@ jobs:
             echo $TAG > pr-info/tag.txt
             echo "To test updates run:
 
-                docker run -p 6080:6080 --rm docker.pkg.github.com/it-projects-llc/hound/pr:$TAG
+                docker run -p 6080:6080 --rm docker.pkg.github.com/itpp-labs/hound/pr:$TAG
 
             You may need be [authenticated](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line):
             

@@ -3,7 +3,7 @@ package client
 import (
 	"testing"
 
-	"github.com/it-projects-llc/hound/index"
+	"github.com/itpp-labs/hound/index"
 )
 
 // TODO(knorton):

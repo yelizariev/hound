@@ -12,7 +12,7 @@ import (
 	"runtime"
 	text_template "text/template"
 
-	"github.com/it-projects-llc/hound/config"
+	"github.com/itpp-labs/hound/config"
 )
 
 // An http.Handler for the dev-mode case.
