@@ -162,4 +162,3 @@ Created at [Etsy](https://www.etsy.com) by:
 * [Jonathan Klein](https://github.com/jklein)
 
 Maintained by [IT Projects Labs](https://itpp.dev/).
-
