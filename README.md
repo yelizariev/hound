@@ -27,7 +27,7 @@ go get github.com/itpp-labs/hound/cmds/...
 2015/03/13 09:07:42 Searcher started for statsd
 2015/03/13 09:07:42 Searcher started for Hound
 2015/03/13 09:07:42 All indexes built!
-2015/03/13 09:07:42 running server at http://localhost:6080...
+2015/03/13 09:07:42 running server at http://localhost:6080
 ```
 
 ### Using Docker (1.4+)
