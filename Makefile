@@ -33,6 +33,7 @@ dev: ALL
 
 test:
 	go test github.com/itpp-labs/hound/...
+	npm test
 
 clean:
 	rm -rf .build node_modules
