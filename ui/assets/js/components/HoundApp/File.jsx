@@ -1,46 +1,60 @@
-import React, { createRef } from 'react';
+import React, { createRef, useState } from 'react';
 import { CoalesceMatches, ContentFor } from '../../utils';
 import { Model } from '../../helpers/Model';
 import { Match } from './Match';
 
-export const File = (props) => {
+export class File extends React.Component {
+    constructor(props) {
+        super(props)
+        this.state = {showContent: true}
+        this.textArea = createRef(null)
+        this.toggleContent = this.toggleContent.bind(this)
+        this.copyFilepath = this.copyFilepath.bind(this)
+    }
+    openOrClose(to_open) {
+        this.setState({'showContent': to_open})
+    }
+    toggleContent() {
+        console.log('toggleContent')
+        this.setState({'showContent': !this.state.showContent})
+    }
+    copyFilepath(evt) {
+        evt.preventDefault()
+        evt.stopPropagation()
+        console.log(evt)
+        this.textArea.current.select()
+        document.execCommand('copy')
+    }
 
-    const { repo, rev, match, regexp } = props;
-    const filename = match.Filename;
-    const blocks = CoalesceMatches(match.Matches);
+    render (){
+        const filename = this.props.match.Filename;
+        const blocks = CoalesceMatches(this.props.match.Matches);
 
-    const textArea = createRef(null);
-
-    const copyFilepath = (evt) => {
-        evt.preventDefault();
-        textArea.current.select();
-        document.execCommand('copy');
-    };
-
-    const matches = blocks.map((block, index) => (
-        <Match
-            key={`match-${repo}-${index}`}
-            block={ block }
-            repo={ repo }
-            regexp={ regexp }
-            rev={ rev }
-            filename={ filename }
-        />
-    ));
+        const matches = blocks.map((block, index) => (
+            <Match
+              key={`match-${this.props.repo}-${index}`}
+              block={ block }
+              repo={ this.props.repo }
+              regexp={ this.props.regexp }
+              rev={ this.props.rev }
+              filename={ filename }
+              />
+        ));
 
     return (
-        <div className="file">
-            <div className="title">
-                <a href={ Model.UrlToRepo(repo, filename, null, rev) }>
+        <div className={"file " + (this.state.showContent ? "open" : "closed")}>
+            <div className="title" onClick={ this.toggleContent }>
+              <a href={ Model.UrlToRepo(this.props.repo, filename, null, this.props.rev) }>
                     { filename }
                 </a>
-                <a href="#" className="octicon octicon-clippy copy-file-path" title="Copy to clipboard" onClick={ copyFilepath }></a>
+              <a href="#" className="octicon octicon-clippy copy-file-path" title="Copy to clipboard" onClick={ this.copyFilepath }></a>
             </div>
             <div className="file-body">
                 { matches }
             </div>
-            <textarea className="copy-file-path-textarea" ref={ textArea } defaultValue={ filename }></textarea>
+            <textarea className="copy-file-path-textarea" ref={ this.textArea } defaultValue={ filename }></textarea>
         </div>
-    );
+    )
+    }
 
 };
