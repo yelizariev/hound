@@ -5,8 +5,7 @@ on:
     branches:
       - master
     paths: 
-      - "**"
-      - !ui/bindata.go
+      - "!ui/bindata.go"
 
 jobs:
   build:
