@@ -2,7 +2,10 @@ name: Rebuilding Docker Images
 
 on: 
   push:
+    branches:
+      - master
     paths: 
+      - "**"
       - !ui/bindata.go
 
 jobs:
