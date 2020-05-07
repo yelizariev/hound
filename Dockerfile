@@ -23,6 +23,6 @@ RUN [ "$DEV" = "no" ] \
 
 VOLUME ["/data"]
 
-EXPOSE 6080
+EXPOSE 6080 9000
 
 ENTRYPOINT ["/go/bin/houndd", "-conf", "/data/config.json"]
