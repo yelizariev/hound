@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -75,25 +74,6 @@ func registerShutdownSignal() <-chan os.Signal {
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, gracefulShutdownSignal)
 	return shutdownCh
-}
-
-func makeTemplateData(cfg *config.Config) (interface{}, error) {
-	var data struct {
-		ReposAsJson string
-	}
-
-	res := map[string]*config.Repo{}
-	for name, repo := range cfg.Repos {
-		res[name] = repo
-	}
-
-	b, err := json.Marshal(res)
-	if err != nil {
-		return nil, err
-	}
-
-	data.ReposAsJson = string(b)
-	return &data, nil
 }
 
 func runHttp(

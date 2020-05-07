@@ -1,5 +1,8 @@
 {
   "dbpath" : "db",
+  "init-search": {
+      "excludeFiles": "ui/bindata.go"
+  },
   "repos" : {
     "Hound" : {
       "url" : "https://github.com/itpp-labs/hound.git"

@@ -37,6 +37,13 @@ export const Model = {
         return Object.keys(this.repos).length;
     },
 
+    LoadConfig () {
+        this.config = {};
+        if (typeof ClientConfigJson != 'undefined') {
+            this.config = JSON.parse(ClientConfigJson);
+        }
+    },
+
     Load () {
 
         const _this = this;

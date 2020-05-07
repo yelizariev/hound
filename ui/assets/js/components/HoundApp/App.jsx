@@ -19,7 +19,16 @@ export const App = function (props) {
 
     useEffect(() => {
 
-        const urlParams = ParamsFromUrl();
+        const config = Model.config;
+        const InitSearch = config.InitSearch || {};
+        const initParams = {
+            q: InitSearch.q || '',
+            i: InitSearch.i || 'nope',
+            files: InitSearch.files || '',
+            excludeFiles: InitSearch.excludeFiles || '',
+            repos: InitSearch.repos || '*'
+        }
+        const urlParams = ParamsFromUrl(initParams);
         setQuery(urlParams.q);
         setIgnoreCase(urlParams.i);
         setFiles(urlParams.files);

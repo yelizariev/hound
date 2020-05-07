@@ -61,11 +61,16 @@ func (r *Repo) PushUpdatesEnabled() bool {
 }
 
 type Config struct {
-	DbPath                string           `json:"dbpath"`
-	Title                 string           `json:"title"`
-	Repos                 map[string]*Repo `json:"repos"`
-	MaxConcurrentIndexers int              `json:"max-concurrent-indexers"`
-	HealthCheckURI        string           `json:"health-check-uri"`
+	DbPath                string            `json:"dbpath"`
+	Title                 string            `json:"title"`
+	Repos                 map[string]*Repo  `json:"repos"`
+	MaxConcurrentIndexers int               `json:"max-concurrent-indexers"`
+	HealthCheckURI        string            `json:"health-check-uri"`
+	InitSearch            map[string]string `json:"init-search"`
+}
+
+type ClientConfig struct {
+	InitSearch map[string]string
 }
 
 // SecretMessage is just like json.RawMessage but it will not
@@ -167,7 +172,8 @@ func (c *Config) LoadFromFile(filename string) error {
 }
 
 func (c *Config) ToJsonString() (string, error) {
-	b, err := json.Marshal(c.Repos)
+	client := ClientConfig{c.InitSearch}
+	b, err := json.Marshal(client)
 	if err != nil {
 		return "", err
 	}
