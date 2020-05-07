@@ -55,7 +55,10 @@ jobs:
             echo $TAG > pr-info/tag.txt
             echo "To test updates run:
 
+                # normal
                 docker run -p 6080:6080 --rm docker.pkg.github.com/itpp-labs/hound/pr:$TAG
+                # dev
+                docker run -p 6080:6080 -p 9000:9000 --rm docker.pkg.github.com/itpp-labs/hound/pr:$TAG --dev
 
             You may need be [authenticated](https://help.github.com/en/github/authenticating-to-github/creating-a-personal-access-token-for-the-command-line):
             
