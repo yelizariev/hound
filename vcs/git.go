@@ -11,29 +11,14 @@ import (
 	"strings"
 )
 
-const defaultRef = "master"
-
 func init() {
 	Register(newGit, "git")
 }
 
-type GitDriver struct {
-	Ref string `json:"ref"`
-}
+type GitDriver struct{}
 
 func newGit(b []byte) (Driver, error) {
-	d := &GitDriver{
-		Ref: defaultRef,
-	}
-
-	if b == nil {
-		return d, nil
-	}
-
-	if e := json.Unmarshal(b, d); e != nil {
-		return nil, e
-	}
-	return d, nil
+	return &GitDriver{}, nil
 }
 
 func (g *GitDriver) HeadRev(dir string) (string, error) {
@@ -75,7 +60,7 @@ func run(desc, dir, cmd string, args ...string) error {
 	return nil
 }
 
-func (g *GitDriver) Pull(dir string) (string, error) {
+func (g *GitDriver) Pull(commonDir, dir, ref string) (string, error) {
 	if err := run("git fetch", dir,
 		"git",
 		"fetch",
@@ -83,7 +68,7 @@ func (g *GitDriver) Pull(dir string) (string, error) {
 		"--no-tags",
 		"--depth", "1",
 		"origin",
-		fmt.Sprintf("+%s:remotes/origin/%s", g.Ref, g.Ref)); err != nil {
+		fmt.Sprintf("+%s:remotes/origin/%s", ref, ref)); err != nil {
 		return "", err
 	}
 
@@ -91,20 +76,53 @@ func (g *GitDriver) Pull(dir string) (string, error) {
 		"git",
 		"reset",
 		"--hard",
-		fmt.Sprintf("origin/%s", g.Ref)); err != nil {
+		fmt.Sprintf("origin/%s", ref)); err != nil {
 		return "", err
 	}
 
 	return g.HeadRev(dir)
 }
 
-func (g *GitDriver) Clone(dir, url string) (string, error) {
-	par, rep := filepath.Split(dir)
+func (g *GitDriver) Clone(commonDir, dir, url, ref string) (string, error) {
+	cmd := exec.Command(
+		"git",
+		"fetch",
+		"--prune",
+		"--no-tags",
+		"--depth", "1",
+		"origin",
+		fmt.Sprintf("origin/%s", ref),
+	)
+	cmd.Dir = commonDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to fetch %s#%s, see output below\n%sContinuing...", url, ref, out)
+		return "", err
+	}
+
+	cmd = exec.Command(
+		"git",
+		"worktree",
+		"add",
+		dir,
+		fmt.Sprintf("origin/%s", ref),
+	)
+	cmd.Dir = commonDir
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to make worktree %s#%s, see output below\n%sContinuing...", url, ref, out)
+		return "", err
+	}
+
+	return g.HeadRev(dir)
+}
+
+func (g *GitDriver) CloneCommon(commonDir, url string) (string, error) {
+	par, rep := filepath.Split(commonDir)
 	cmd := exec.Command(
 		"git",
 		"clone",
 		"--depth", "1",
-		"--branch", g.Ref,
 		url,
 		rep)
 	cmd.Dir = par
@@ -114,7 +132,7 @@ func (g *GitDriver) Clone(dir, url string) (string, error) {
 		return "", err
 	}
 
-	return g.HeadRev(dir)
+	return g.HeadRev(commonDir)
 }
 
 func (g *GitDriver) SpecialFiles() []string {

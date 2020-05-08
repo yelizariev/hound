@@ -10,10 +10,17 @@
         "SomeGitRepo" : {
             "url" : "https://www.github.com/YourOrganization/RepoOne.git"
         },
-        "AnotherGitRepo" : {
+        "AnotherGitRepo#master" : {
+            "url" : "https://www.github.com/YourOrganization/RepoOne.git",
+            "ms-between-poll": 3600333,
+            "exclude-dot-files": true,
+            "vcs-ref": "master"
+        },
+        "AnotherGitRepo#dev" : {
             "url" : "https://www.github.com/YourOrganization/RepoOne.git",
             "ms-between-poll": 10000,
-            "exclude-dot-files": true
+            "exclude-dot-files": true,
+            "vcs-ref": "dev"
         },
         "SomeMercurialRepo" : {
             "url" : "https://www.example.com/foo/hg",

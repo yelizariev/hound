@@ -15,11 +15,14 @@ var drivers = make(map[string]func(c []byte) (Driver, error))
 // operations that hound needs.
 type Driver interface {
 
+	// Prepare common folder (e.g. to use "git worktree" in Clone)
+	CloneCommon(commonDir, url string) (string, error)
+
 	// Clone a new working directory.
-	Clone(dir, url string) (string, error)
+	Clone(commonDir, dir, url, ref string) (string, error)
 
 	// Pull new changes from the server and update the working directory.
-	Pull(dir string) (string, error)
+	Pull(commonDir, dir, ref string) (string, error)
 
 	// Return the revision at the head of the vcs directory.
 	HeadRev(dir string) (string, error)
@@ -69,9 +72,12 @@ func exists(path string) bool {
 
 // A utility method that carries out the common operation of cloning
 // if the working directory is absent and pulling otherwise.
-func (w *WorkDir) PullOrClone(dir, url string) (string, error) {
-	if exists(dir) {
-		return w.Pull(dir)
+func (w *WorkDir) PullOrClone(commonDir, dir, url, ref string) (string, error) {
+	if !exists(commonDir) {
+		return w.CloneCommon(commonDir, url)
 	}
-	return w.Clone(dir, url)
+	if !exists(dir) {
+		return w.Clone(commonDir, dir, url, ref)
+	}
+	return w.Pull(commonDir, dir, ref)
 }

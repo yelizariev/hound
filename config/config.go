@@ -14,6 +14,7 @@ const (
 	defaultPollEnabled           = true
 	defaultTitle                 = "Hound"
 	defaultVcs                   = "git"
+	defaultVcsRef                = "master"
 	defaultBaseUrl               = "{url}/blob/{rev}/{path}{anchor}"
 	defaultAnchor                = "#L{line}"
 	defaultHealthCheckURI        = "/healthz"
@@ -25,14 +26,15 @@ type UrlPattern struct {
 }
 
 type PatternLink struct {
-    Pattern string `json:"pattern"`
-    Link    string `json:"link"`
+	Pattern string `json:"pattern"`
+	Link    string `json:"link"`
 }
 
 type Repo struct {
 	Url               string         `json:"url"`
 	MsBetweenPolls    int            `json:"ms-between-poll"`
 	Vcs               string         `json:"vcs"`
+	VcsRef            string         `json:"vcs-ref"`
 	VcsConfigMessage  *SecretMessage `json:"vcs-config"`
 	UrlPattern        *UrlPattern    `json:"url-pattern"`
 	ExcludeDotFiles   bool           `json:"exclude-dot-files"`
@@ -109,6 +111,10 @@ func initRepo(r *Repo) {
 
 	if r.Vcs == "" {
 		r.Vcs = defaultVcs
+	}
+
+	if r.VcsRef == "" {
+		r.VcsRef = defaultVcsRef
 	}
 
 	if r.UrlPattern == nil {

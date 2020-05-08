@@ -270,7 +270,10 @@ func hashFor(name string) string {
 
 // Create a normalized name for the vcs directory of this repo.
 func vcsDirFor(repo *config.Repo) string {
-	return fmt.Sprintf("vcs-%s", hashFor(repo.Url))
+	return fmt.Sprintf("vcs-%s", hashFor(fmt.Stringf("%s#%s", repo.Url, repo.VcsRef)))
+}
+func vcsCommonDirFor(repo *config.Repo) string {
+	return fmt.Sprintf("vcs-cache-%s", hashFor(repo.Url))
 }
 
 func init() {
@@ -343,6 +346,7 @@ func New(dbpath, name string, repo *config.Repo) (*Searcher, error) {
 func updateAndReindex(
 	s *Searcher,
 	dbpath,
+	vcsCommonDir,
 	vcsDir,
 	name,
 	rev string,
@@ -355,7 +359,7 @@ func updateAndReindex(
 	defer lim.Release()
 
 	repo := s.Repo
-	newRev, err := wd.PullOrClone(vcsDir, repo.Url)
+	newRev, err := wd.PullOrClone(vcsCommonDir, vcsDir, repo.Url)
 
 	if err != nil {
 		log.Printf("vcs pull error (%s - %s): %s", name, repo.Url, err)
@@ -399,6 +403,7 @@ func newSearcher(
 	lim limiter) (*Searcher, error) {
 
 	vcsDir := filepath.Join(dbpath, vcsDirFor(repo))
+	vcsCommonDir := filepath.Join(dbpath, vcsCommonDirFor(repo))
 
 	log.Printf("Searcher started for %s", name)
 
@@ -412,7 +417,7 @@ func newSearcher(
 		SpecialFiles:    wd.SpecialFiles(),
 	}
 
-	rev, err := wd.PullOrClone(vcsDir, repo.Url)
+	rev, err := wd.PullOrClone(vcsCommonDir, vcsDir, repo.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +476,7 @@ func newSearcher(
 			}
 
 			// attempt to update and reindex this searcher
-			newRev, ok := updateAndReindex(s, dbpath, vcsDir, name, rev, wd, opt, lim)
+			newRev, ok := updateAndReindex(s, dbpath, vcsCommonDir, vcsDir, name, rev, wd, opt, lim)
 			if !ok {
 				continue
 			}
