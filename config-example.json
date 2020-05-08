@@ -3,6 +3,9 @@
     "dbpath" : "data",
     "title" : "Hound",
     "health-check-uri" : "/healthz",
+    "init-search": {
+        "excludeFiles": "ui/bindata.go"
+    },
     "repos" : {
         "SomeGitRepo" : {
             "url" : "https://www.github.com/YourOrganization/RepoOne.git"

@@ -96,10 +96,10 @@ func renderForDev(w io.Writer, root string, c *content, cfg *config.Config, r *h
 	}
 
 	return c.tpl.Execute(w, map[string]interface{}{
-		"ReposAsJson": json,
-		"Title":       cfg.Title,
-		"Source":      html_template.HTML(buf.String()),
-		"Host":        r.Host,
+		"ClientConfigJson": json,
+		"Title":            cfg.Title,
+		"Source":           html_template.HTML(buf.String()),
+		"Host":             r.Host,
 	})
 }
 
@@ -155,10 +155,10 @@ func renderForPrd(w io.Writer, c *content, cfg *config.Config, cfgJson string, r
 	buf.WriteString("</script>")
 
 	return c.tpl.Execute(w, map[string]interface{}{
-		"ReposAsJson": cfgJson,
-		"Title":       cfg.Title,
-		"Source":      html_template.HTML(buf.String()),
-		"Host":        r.Host,
+		"ClientConfigJson": cfgJson,
+		"Title":            cfg.Title,
+		"Source":           html_template.HTML(buf.String()),
+		"Host":             r.Host,
 	})
 }
 
