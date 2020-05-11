@@ -269,8 +269,8 @@ func hashFor(name string) string {
 }
 
 // Create a normalized name for the vcs directory of this repo.
-func vcsDirFor(repo *config.Repo) string {
-	return fmt.Sprintf("vcs-%s", hashFor(repo.Url))
+func vcsDirFor(name string, repo *config.Repo) string {
+	return fmt.Sprintf("vcs-%s", hashFor(name+repo.Url))
 }
 
 func init() {
@@ -398,7 +398,7 @@ func newSearcher(
 	refs *foundRefs,
 	lim limiter) (*Searcher, error) {
 
-	vcsDir := filepath.Join(dbpath, vcsDirFor(repo))
+	vcsDir := filepath.Join(dbpath, vcsDirFor(name, repo))
 
 	log.Printf("Searcher started for %s", name)
 
