@@ -5,12 +5,13 @@ import Select from 'react-select';
 
 export const SearchBar = (props) => {
 
-    const { query, ignoreCase, files, excludeFiles, repos, allRepos, stats, onSearchRequested } = props;
+    const { query, ignoreCase, files, excludeFiles, repos, allRepos, reposRE, stats, onSearchRequested } = props;
     const [ showAdvanced, setShowAdvanced] = useState(false);
     const [ searchQuery, setSearchQuery ] = useState(query);
     const [ searchIgnoreCase, setSearchIgnoreCase ] = useState(ignoreCase);
     const [ searchFiles, setSearchFiles ] = useState(files);
     const [ searchExcludeFiles, setSearchExcludeFiles ] = useState(excludeFiles);
+    const [ searchReposRE, setSearchReposRE ] = useState(reposRE);
     const [ searchRepos, setSearchRepos ] = useState(repos);
     const queryInput = useRef(null);
     const fileInput = useRef(null);
@@ -20,13 +21,14 @@ export const SearchBar = (props) => {
         ( searchFiles && searchFiles.trim() !== '' ) ||
         ( searchExcludeFiles && searchExcludeFiles.trim() !== '' ) ||
         ( searchIgnoreCase && searchIgnoreCase.trim() === 'fosho' ) ||
-        ( searchRepos && searchRepos.length > 0 )
+        ( searchReposRE && searchReposRE.trim() !== '' )
     );
 
     useEffect(() => { setSearchQuery(query) }, [query]);
     useEffect(() => { setSearchIgnoreCase(ignoreCase) }, [ignoreCase]);
     useEffect(() => { setSearchFiles(files) }, [files]);
     useEffect(() => { setSearchExcludeFiles(excludeFiles) }, [excludeFiles]);
+    useEffect(() => { setSearchReposRE(reposRE); }, [reposRE]);
     useEffect(() => { setSearchRepos(repos) }, [repos]);
 
     const repoOptions = allRepos.map(rname => ({
@@ -62,6 +64,11 @@ export const SearchBar = (props) => {
             case 'excludeFiles':
                 setSearchExcludeFiles(evt.currentTarget.value);
                 break;
+            case 'reposRE':
+                setSearchReposRE(evt.currentTarget.value);
+                // repos RE is changed manually, so remove selection
+                setSearchRepos([]);
+                break;
             case 'ignoreCase':
                 setSearchIgnoreCase(evt.currentTarget.checked && 'fosho' || 'nope');
                 break;
@@ -69,16 +76,13 @@ export const SearchBar = (props) => {
     };
 
     const submitQuery = () => {
-        console.log('submitQuery', searchExcludeFiles);
         if (searchQuery.trim() !== '') {
             onSearchRequested({
                 q: searchQuery,
                 i: searchIgnoreCase,
                 files: searchFiles,
                 excludeFiles: searchExcludeFiles,
-                repos: Model.ValidRepos(searchRepos) === Model.RepoCount()
-                    ? ''
-                    : searchRepos.join(',')
+                repos: searchReposRE
             });
         }
     };
@@ -134,12 +138,27 @@ export const SearchBar = (props) => {
         }
     };
 
+    const reposREGotKeydown = (event) => {
+        switch (event.keyCode) {
+        case 38:
+            // if advanced is empty, close it up.
+            if (searchReposRE.trim() === '') {
+                hideAdvancedCallback();
+            }
+            queryInput.current.focus();
+            break;
+        case 13:
+            submitQuery();
+            break;
+        }
+    };
+
     const repoSelected = (selected) => {
-        setSearchRepos(
-            selected
-                ? selected.map(item => item.value)
-                : []
-        );
+        const repos = selected
+              ? selected.map(item => item.value)
+              : []
+        setSearchRepos(repos);
+        setSearchReposRE(repos ? repos.map(r => "^" + r + "$").join("|") : ".*")
     };
 
     const statsView = stats
@@ -212,6 +231,18 @@ export const SearchBar = (props) => {
                         <div className="field-input">
                             <input type="checkbox" onChange={ elementChanged.bind(this, "ignoreCase") } checked={ ParamValueToBool(searchIgnoreCase) } />
                         </div>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="reposRE">Repos</label>
+                      <div className="field-input">
+                        <input
+                          type="text"
+                          placeholder="regexp"
+                          value={ searchReposRE }
+                          onChange={ elementChanged.bind(this, "reposRE") }
+                          onKeyDown={ reposREGotKeydown }
+                          />
+                      </div>
                     </div>
                     <div className="field-repo-select">
                         <label className="multiselect_label" htmlFor="repos">Select Repo</label>

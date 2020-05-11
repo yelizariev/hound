@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/itpp-labs/hound/codesearch/regexp"
 	"github.com/itpp-labs/hound/config"
 	"github.com/itpp-labs/hound/index"
 	"github.com/itpp-labs/hound/searcher"
@@ -103,15 +104,28 @@ func parseAsBool(v string) bool {
 func parseAsRepoList(v string, idx map[string]*searcher.Searcher) []string {
 	v = strings.TrimSpace(v)
 	var repos []string
+	if v == "" {
+		v = ".*"
+	}
 	if v == "*" {
-		for repo := range idx {
-			repos = append(repos, repo)
+		// Backward compatibility
+		v = ".*"
+	}
+	if strings.Contains(v, ",") {
+		// Backward compatibility
+		// This also means, that repo name in config cannot have commas
+		var new_v []string
+		for _, repo := range strings.Split(v, ",") {
+			repo_regexp := "^" + repo + "$"
+			new_v = append(new_v, repo_regexp)
 		}
-		return repos
+		v = strings.Join(new_v, "|")
 	}
 
-	for _, repo := range strings.Split(v, ",") {
-		if idx[repo] == nil {
+	re, _ := regexp.Compile(v)
+	for repo := range idx {
+		if re.MatchString(repo, true, true) < 0 {
+			// repo doesn't pass regexp
 			continue
 		}
 		repos = append(repos, repo)

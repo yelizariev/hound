@@ -185,6 +185,9 @@ export const Model = {
     },
 
     NameForRepo (repo) {
+        return repo;
+        // TODO: do we need this method?
+
         const info = this.repos[repo];
         if (!info) {
             return repo;

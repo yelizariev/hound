@@ -12,6 +12,7 @@ export const App = function (props) {
     const [ files, setFiles ] = useState('');
     const [ excludeFiles, setExcludeFiles ] = useState('');
     const [ repos, setRepos ] = useState([]);
+    const [ reposRE, setReposRE ] = useState('');
     const [ allRepos, setAllRepos ] = useState([]);
     const [ stats, setStats ] = useState('');
     const [ results, setResults ] = useState(null);
@@ -26,16 +27,14 @@ export const App = function (props) {
             i: InitSearch.i || 'nope',
             files: InitSearch.files || '',
             excludeFiles: InitSearch.excludeFiles || '',
-            repos: InitSearch.repos || '*'
+            repos: InitSearch.repos || '.*'
         }
         const urlParams = ParamsFromUrl(initParams);
         setQuery(urlParams.q);
         setIgnoreCase(urlParams.i);
         setFiles(urlParams.files);
         setExcludeFiles(urlParams.excludeFiles);
-        setRepos(
-            (urlParams.repos === '') ? [] : urlParams.repos.split(',')
-        );
+        setReposRE(urlParams.repos);
 
         Model.didLoadRepos.tap((model, allRepos) => {
             // If all repos are selected, don't show any selected.
@@ -67,7 +66,10 @@ export const App = function (props) {
             if ( urlParams.i !== ignoreCase ) { setIgnoreCase(urlParams.i) }
             if ( urlParams.files !== files ) { setFiles(urlParams.files) }
             if ( urlParams.excludeFiles !== excludeFiles ) { setExcludeFiles(urlParams.excludeFiles) }
-            setRepos( (urlParams.repos === '') ? [] : urlParams.repos.split(',') );
+            if ( urlParams.repos !== reposRE ) {
+                setReposRE(urlParams.reposRE)
+                setRepos([])
+            }
             Model.Search(urlParams);
         });
 
@@ -79,7 +81,7 @@ export const App = function (props) {
             + `&i=${ encodeURIComponent(params.i) }`
             + `&files=${ encodeURIComponent(params.files) }`
             + `&excludeFiles=${ encodeURIComponent(params.excludeFiles) }`
-            + `&repos=${ params.repos }`;
+            + `&repos=${ encodeURIComponent(params.repos) }`;
         history.pushState({ path: path }, '', path);
     };
 
@@ -89,6 +91,7 @@ export const App = function (props) {
         if ( params.i !== ignoreCase ) { setIgnoreCase(params.i) }
         if ( params.files !== files ) { setFiles(params.files) }
         if ( params.excludeFiles !== excludeFiles ) { setExcludeFiles(params.excludeFiles) }
+        if ( params.repos !== reposRE ) { setReposRE(params.reposRE) }
         setResults(null);
         Model.Search(params);
     };
@@ -101,6 +104,7 @@ export const App = function (props) {
                 files={ files }
                 excludeFiles={ excludeFiles }
                 repos={ repos }
+                reposRE={ reposRE }
                 allRepos={ allRepos }
                 stats={ stats }
                 onSearchRequested={ onSearchRequested }
