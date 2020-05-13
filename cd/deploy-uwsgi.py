@@ -8,4 +8,6 @@ def application(env, start_response):
     else:
         code = '500 Error'
     start_response(code, [('Content-Type','text/plain')])
-    return [res.stdout]
+    result = res.stdout
+    print ("RESPONSE:\n%s" % result)
+    return [result]
