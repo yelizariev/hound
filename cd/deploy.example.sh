@@ -1,7 +1,6 @@
 #!/bin/bash
-set -e
 # don't do anything on a wrong request
-test "$1" = "/your-secret"
+test "$1" = "/your-secret" || exit 1
 
 DOCKER=docker.pkg.github.com/itpp-labs/hound/production
 NAME=hound
