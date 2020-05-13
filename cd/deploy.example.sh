@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+# don't do anything on a wrong request
+test "$1" = "/your-secret"
+
 DOCKER=docker.pkg.github.com/itpp-labs/hound/production
 NAME=hound
 DATA=$(pwd)
