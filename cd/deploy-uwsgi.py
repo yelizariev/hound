@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 import subprocess
 
 def application(env, start_response):
-    res = subprocess.run(['bash', 'deploy.sh'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    print("REQUEST: %s", env.get('REQUEST_URI'))
+    res = subprocess.run(['bash', 'deploy.sh', env.get('REQUEST_URI')], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
     if res.returncode == 0:
         code = '200 OK'
