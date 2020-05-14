@@ -6,16 +6,26 @@ import { Repo } from './Repo';
 export const ResultView = (props) => {
 
     const { query, ignoreCase, results, error } = props;
-    const regexp = new RegExp(query.trim(), ignoreCase.trim() === 'fosho' && 'ig' || 'g');
     const isLoading = results === null && query;
     const noResults = !!results && results.length === 0;
 
-    if (error) {
+    const renderError = (message, hint) => {
         return (
             <div id="no-result" className="error">
-                <strong>ERROR:</strong>{ error }
+              <strong>ERROR:</strong>{ message }
             </div>
-        );
+        )
+    }
+
+    if (error) {
+        return renderError(error)
+    }
+
+    let regexp
+    try {
+        regexp = new RegExp(query.trim(), ignoreCase.trim() === 'fosho' && 'ig' || 'g');
+    } catch (exc) {
+        return renderError(exc.message)
     }
 
     if (!isLoading && noResults) {
@@ -26,18 +36,7 @@ export const ResultView = (props) => {
             </div>
         );
     }
-/*
-    const openOrCloseAll = (to_open) => {
-        for (let index in reposShowState) {
-            let [state, setState] = reposShowState[index]
-            if (to_open) {
-                setState(true)
-            } else {
-                setState(false)
-            }
-        }
-    }
-*/
+
     const openOrCloseAll = (to_open) => {
         for (let index in reposRefs) {
             let repo = reposRefs[index]
