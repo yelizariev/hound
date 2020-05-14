@@ -148,6 +148,13 @@ export const ContentFor = (repo, line, regexp) => {
         let len = 0;
         while ( (matches = regexp.exec(line.Content)) !== null ) {
             if (!len) { len = matches[0].length; }
+            if (!len) {
+                // Empty match!
+                // Example of such regexp: "|"
+                // Make a workaround for infinite loop
+                // Reference: https://stackoverflow.com/questions/33015942/regex-exec-loop-never-terminates-in-js
+                regexp.lastIndex++;
+            }
             indexes.push(
                 { index: matches.index, element: startEm },
                 { index: matches.index + len, element: endEm }
