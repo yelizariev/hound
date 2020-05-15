@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 )
@@ -179,4 +180,26 @@ func (c *Config) ToJsonString() (string, error) {
 	}
 
 	return string(b), nil
+}
+func get(dict map[string]string, key, dflt string) string {
+	if value, ok := dict[key]; ok {
+		return value
+	}
+	return dflt
+}
+
+func (c *Config) ToOpenSearchParams() (string, error) {
+	// This must be the same as in App.jsx (see const initParams = ...)
+	// Exception is for InitSearch.q which is not used here
+	i := get(c.InitSearch, "i", "nope")
+	files := get(c.InitSearch, "files", "")
+	excludeFiles := get(c.InitSearch, "excludeFiles", "")
+	repos := get(c.InitSearch, "repos", ".*")
+	params := url.Values{}
+	params.Add("i", i)
+	params.Add("files", files)
+	params.Add("excludeFiles", excludeFiles)
+	params.Add("repos", repos)
+
+	return params.Encode(), nil
 }

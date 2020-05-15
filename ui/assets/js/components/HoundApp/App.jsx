@@ -22,6 +22,7 @@ export const App = function (props) {
 
         const config = Model.config;
         const InitSearch = config.InitSearch || {};
+        // This must be the same as on server side (see config.go > ToOpenSearchParams)
         const initParams = {
             q: InitSearch.q || '',
             i: InitSearch.i || 'nope',
