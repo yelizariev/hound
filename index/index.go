@@ -56,6 +56,13 @@ type Match struct {
 	After      []string
 }
 
+type PreSearchResponse struct {
+	Files       []uint32
+	Re          *regexp.Regexp
+	Duration    time.Duration
+	Found       bool
+	FilesOpened int
+}
 type SearchResponse struct {
 	Matches        []*FileMatch
 	FilesWithMatch int
@@ -140,7 +147,7 @@ func GetRegexpPattern(pat string, ignoreCase bool) string {
 	return "(?m)" + pat
 }
 
-func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) {
+func (n *Index) PreSearch(pat string, opt *SearchOptions) (*PreSearchResponse, error) {
 	startedAt := time.Now()
 
 	n.lck.RLock()
@@ -151,14 +158,7 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		return nil, err
 	}
 
-	var (
-		g                grepper
-		results          []*FileMatch
-		filesOpened      int
-		filesFound       int
-		filesCollected   int
-		matchesCollected int
-	)
+	files := n.idx.PostingQuery(index.RegexpQuery(re.Syntax))
 
 	var fre *regexp.Regexp
 	if opt.FileRegexp != "" {
@@ -176,11 +176,9 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		}
 	}
 
-	files := n.idx.PostingQuery(index.RegexpQuery(re.Syntax))
+	filesFiltered := files[:0]
 	for _, file := range files {
-		var matches []*Match
 		name := n.idx.Name(file)
-		hasMatch := false
 
 		// reject files that do not match the file pattern
 		if fre != nil && fre.MatchString(name, true, true) < 0 {
@@ -191,6 +189,64 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		if efre != nil && efre.MatchString(name, true, true) > 0 {
 			continue
 		}
+		filesFiltered = append(filesFiltered, file)
+	}
+
+	var filesOpened int
+	var g grepper
+	i := 0
+	found := false
+	// confirm finding by searching for first successfully grepped file
+	for _, file := range filesFiltered {
+		if !found {
+			filesOpened++
+			name := n.idx.Name(file)
+			if err := g.grep2File(filepath.Join(n.Ref.dir, "raw", name), re, 0,
+				func(line []byte, lineno int, before [][]byte, after [][]byte) (bool, error) {
+
+					found = true
+					// false means "stop grepping"
+					return false, nil
+				}); err != nil {
+				return nil, err
+			}
+		}
+		// it's not the same as "else"
+		if found {
+			filesFiltered[i] = file
+			i++
+		}
+	}
+	// https://github.com/golang/go/wiki/SliceTricks#filter-in-place
+	filesFiltered = filesFiltered[:i]
+
+	return &PreSearchResponse{
+		Found:       len(filesFiltered) != 0,
+		Files:       filesFiltered,
+		Re:          re,
+		Duration:    time.Now().Sub(startedAt),
+		FilesOpened: filesOpened,
+	}, nil
+
+}
+func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*SearchResponse, error) {
+	startedAt := time.Now()
+	re := searched.Re
+	files := searched.Files
+	filesOpened := searched.FilesOpened
+
+	var (
+		g                grepper
+		results          []*FileMatch
+		filesFound       int
+		filesCollected   int
+		matchesCollected int
+	)
+
+	for _, file := range files {
+		var matches []*Match
+		name := n.idx.Name(file)
+		hasMatch := false
 
 		filesOpened++
 		if err := g.grep2File(filepath.Join(n.Ref.dir, "raw", name), re, int(opt.LinesOfContext),
@@ -219,6 +275,7 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		}
 
 		if !hasMatch {
+			// Why it actually happens? Algorithm optimization?
 			continue
 		}
 

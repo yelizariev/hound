@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
+	//"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/itpp-labs/hound/api"
+	//"github.com/itpp-labs/hound/api"
 	"github.com/itpp-labs/hound/config"
 	"github.com/itpp-labs/hound/searcher"
-	"github.com/itpp-labs/hound/ui"
+	//"github.com/itpp-labs/hound/ui"
 	"github.com/itpp-labs/hound/web"
 )
 
@@ -76,6 +76,8 @@ func registerShutdownSignal() <-chan os.Signal {
 	return shutdownCh
 }
 
+/*
+// TODO: if we need this method, it should be update according to new method specs
 func runHttp(
 	addr string,
 	dev bool,
@@ -92,6 +94,7 @@ func runHttp(
 	api.Setup(m, idx)
 	return http.ListenAndServe(addr, m)
 }
+*/
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())

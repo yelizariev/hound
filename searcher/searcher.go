@@ -128,10 +128,18 @@ func (s *Searcher) swapIndexes(idx *index.Index) error {
 // and the options.
 //
 // TODO(knorton): pat should really just be a part of SearchOptions
-func (s *Searcher) Search(pat string, opt *index.SearchOptions) (*index.SearchResponse, error) {
+func (s *Searcher) PreSearch(pat string, opt *index.SearchOptions) (*index.PreSearchResponse, error) {
 	s.lck.RLock()
-	defer s.lck.RUnlock()
-	return s.idx.Search(pat, opt)
+	return s.idx.PreSearch(pat, opt)
+}
+
+// Grep files
+func (s *Searcher) Search(res *index.PreSearchResponse, opt *index.SearchOptions) (*index.SearchResponse, error) {
+	return s.idx.Search(res, opt)
+}
+
+func (s *Searcher) SearchCleanUp() {
+	s.lck.RUnlock()
 }
 
 // Get the excluded files as a JSON string. This is only used for returning

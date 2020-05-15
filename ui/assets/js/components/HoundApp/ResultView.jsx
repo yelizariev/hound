@@ -5,7 +5,7 @@ import { Repo } from './Repo';
 
 export const ResultView = (props) => {
 
-    const { query, ignoreCase, results, error } = props;
+    const { query, ignoreCase, results, reposPagination, error } = props;
     const isLoading = results === null && query;
     const noResults = !!results && results.length === 0;
 
@@ -61,6 +61,15 @@ export const ResultView = (props) => {
             </div>
     ) : ""
 
+    const onLoadOtherRepos = () => Model.LoadOtherRepos();
+
+    console.log("reposPagination", reposPagination)
+    const loadOtherRepos = reposPagination && reposPagination.OtherRepos > 1 ? (
+        <button className="moar" onClick={ onLoadOtherRepos }>
+          Search more results in { reposPagination.OtherRepos } repositories
+        </button>
+    ) : ""
+
     const reposRefs = {}
     const repos = results
           ? results.map((result, index) => {
@@ -86,6 +95,7 @@ export const ResultView = (props) => {
             </div>
             { actions }
             { repos }
+            { loadOtherRepos }
         </div>
     );
 };

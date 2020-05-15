@@ -15,8 +15,9 @@ import (
 type Response struct {
 	Results map[string]*index.SearchResponse
 	Stats   *struct {
-		FilesOpened int
-		Duration    int
+		FilesOpened  int
+		ReposScanned int
+		Duration     int
 	} `json:",omitempty"`
 }
 

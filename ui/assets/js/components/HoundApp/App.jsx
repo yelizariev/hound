@@ -15,6 +15,7 @@ export const App = function (props) {
     const [ reposRE, setReposRE ] = useState('');
     const [ allRepos, setAllRepos ] = useState([]);
     const [ stats, setStats ] = useState('');
+    const [ reposPagination, setReposPagination ] = useState(null);
     const [ results, setResults ] = useState(null);
     const [ error, setError ] = useState(null);
 
@@ -45,14 +46,22 @@ export const App = function (props) {
             setAllRepos(Object.keys(allRepos));
         });
 
-        Model.didSearch.tap((model, results, stats) => {
+        Model.didSearch.tap((model, results, stats, reposPagination) => {
+            console.log("didSearch", reposPagination)
             setStats(stats);
             setResults(results);
+            setReposPagination(reposPagination);
             setError(null);
         });
 
         Model.didLoadMore.tap((model, repo, results) => {
             setResults([...results]);
+            setError(null);
+        });
+
+        Model.didLoadOtherRepos.tap((model, results, reposPagination) => {
+            setResults(results);
+            setReposPagination(reposPagination);
             setError(null);
         });
 
@@ -94,6 +103,7 @@ export const App = function (props) {
         if ( params.excludeFiles !== excludeFiles ) { setExcludeFiles(params.excludeFiles) }
         if ( params.repos !== reposRE ) { setReposRE(params.reposRE) }
         setResults(null);
+        setReposPagination(null);
         Model.Search(params);
     };
 
@@ -114,6 +124,7 @@ export const App = function (props) {
                 query={ query }
                 ignoreCase={ ignoreCase }
                 results={ results }
+                reposPagination={ reposPagination }
                 error={ error }
             />
             <SelectionTooltip delay={ 50 }/>
