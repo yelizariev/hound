@@ -76,6 +76,8 @@ func registerShutdownSignal() <-chan os.Signal {
 	return shutdownCh
 }
 
+/*
+// TODO: if we need this method, it should be update according to new method specs
 func runHttp(
 	addr string,
 	dev bool,
@@ -92,6 +94,7 @@ func runHttp(
 	api.Setup(m, idx)
 	return http.ListenAndServe(addr, m)
 }
+*/
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())

@@ -85,7 +85,49 @@ not work. (This also doesn't work on local folders that are not of a supported r
 
 ## Keeping Repos Updated
 
-By default Hound polls the URL in the config for updates every 30 seconds. You can override this value by setting the `ms-between-poll` key on a per repo basis in the config. If you are indexing a large number of repositories, you may also be interested in tweaking the `max-concurrent-indexers` property. You can see how these work in the [example config](config-example.json). 
+By default Hound polls the URL in the config for updates every 30 seconds. You can override this value by setting the `ms-between-poll` key on a per repo basis in the config. If you are indexing a large number of repositories, you may also be interested in tweaking the `max-concurrent-indexers` property. You can see how these work in the [example config](config-example.json).
+
+## Search optimization
+
+If you have large num of repositories you may be interested in tweaking following configs:
+
+* `max-concurrent-searchers`
+* `max-repos-in-first-result` -- instructs hound to don't show results from more repos than this number
+* `max-repos-in-next-result` -- max num repos to show when users clicks "Load from other repos"
+
+Note, that not every repo may have a search results. That means that to find some results in 10 repos, hound may scan 100 repos. Depending on your need and server copacity, you may set different value for `max-concurrent-searchers`. Let's assume that we have 1000 repos to scan and we want to show result from 10 repos (10 is a number either from `max-repos-in-first-result` or `max-repos-in-next-result` property). Let's say that we have 2 search requests: **reqA** -- gets findings in every first 10 repos, **reqB** -- requires to scan first 100 repos to get 10 repos with findings. Then we'll have following pictures depending on `max-concurrent-searchers` property:
+
+* `max-concurrent-searchers` has value 200:
+
+  * **reqA**:
+
+    * 200-1000 repos are concurrently scanned by 200 searchers. The exact number
+      of scanned repos depends on time for each repo and distribution of the
+      repos between searchers: imagine that first repo requires very long time
+      to process -- at this case the rest searchers will not stop working until
+      we got 10 repos with findings
+    * 190-990 results are ignored
+
+  * **reqB**:
+
+    * 200-1000 repos are concurrently scanned by 200 searchers
+    * 100-900 results are ignored
+
+* `max-concurrent-searchers` has value 20:
+
+  * **reqA**:
+
+    * 20-1000 repos are concurrently scanned by 20 searchers
+    * 10-990 are ignored
+
+  * **reqB**:
+
+    * 119-1000 repos are concurrently scanned by 20 searchers
+    * 19-900 results were ignored
+
+
+  20 searchers runs concurrently; once some of the searchers has scanned 100th repo it stops, the rest 19 searches finish current job and stop too. Findings from 10 repos are displayed. We skipped 90 empty results. Results from 19 repos were ignored. At least 119 repos were scanned (this number depends on time for each repo and distribution of the repos between searchers).
+
 
 ## Editor Integration
 

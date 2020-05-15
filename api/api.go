@@ -51,23 +51,36 @@ type searchResponse struct {
 	err  error
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 /**
  * Searches all repos in parallel.
  */
 func searchAll(
 	query string,
 	opts *index.SearchOptions,
+	cfg *config.Config,
 	repos []string,
+	offsetRepos int,
+	limitRepos int,
 	idx map[string]*searcher.Searcher,
+	reposScanned *int,
 	filesOpened *int,
 	duration *int) (map[string]*index.SearchResponse, error) {
 
 	startedAt := time.Now()
 
 	n := len(repos)
+	searchersNum := min(n, cfg.MaxConcurrentSearchers)
 
 	// use a buffered channel to avoid routine leaks on errs.
-	ch := make(chan *searchResponse, n)
+	ch := make(chan *searchResponse, searchersNum)
+	// TODO: https://stackoverflow.com/questions/6807590/how-to-stop-a-goroutine
 	for _, repo := range repos {
 		go func(repo string) {
 			fms, err := idx[repo].Search(query, opts)
@@ -173,7 +186,7 @@ func parseRangeValue(rv string) (int, int) {
 	return b, e
 }
 
-func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
+func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Config) {
 
 	m.HandleFunc("/api/v1/repos", func(w http.ResponseWriter, r *http.Request) {
 		res := map[string]*config.Repo{}
@@ -191,6 +204,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 		repos := parseAsRepoList(r.FormValue("repos"), idx)
 		query := r.FormValue("q")
 		opt.Offset, opt.Limit = parseRangeValue(r.FormValue("rng"))
+		offsetRepos, limitRepos := parseRangeValue(r.FormValue("rngRepos"))
 		opt.FileRegexp = r.FormValue("files")
 		opt.ExcludeFileRegexp = r.FormValue("excludeFiles")
 		opt.IgnoreCase = parseAsBool(r.FormValue("i"))
@@ -202,8 +216,9 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 
 		var filesOpened int
 		var durationMs int
+		var reposScanned int
 
-		results, err := searchAll(query, &opt, repos, idx, &filesOpened, &durationMs)
+		results, err := searchAll(query, &opt, cfg, repos, offsetRepos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
 		if err != nil {
 			// TODO(knorton): Return ok status because the UI expects it for now.
 			writeError(w, err, http.StatusOK)
