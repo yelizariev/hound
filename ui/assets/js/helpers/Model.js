@@ -138,6 +138,7 @@ export const Model = {
                 _this.stats = {
                     Server: stats.Duration,
                     Total: Date.now() - startedAt,
+                    Repos: stats.ReposScanned,
                     Files: stats.FilesOpened
                 };
 

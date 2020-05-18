@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
+	//"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/itpp-labs/hound/api"
+	//"github.com/itpp-labs/hound/api"
 	"github.com/itpp-labs/hound/config"
 	"github.com/itpp-labs/hound/searcher"
-	"github.com/itpp-labs/hound/ui"
+	//"github.com/itpp-labs/hound/ui"
 	"github.com/itpp-labs/hound/web"
 )
 

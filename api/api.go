@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/itpp-labs/hound/codesearch/regexp"
@@ -22,8 +23,9 @@ const (
 )
 
 type Stats struct {
-	FilesOpened int
-	Duration    int
+	FilesOpened  int64
+	ReposScanned int64
+	Duration     int
 }
 
 func writeJson(w http.ResponseWriter, data interface{}, status int) {
@@ -66,11 +68,10 @@ func searchAll(
 	opts *index.SearchOptions,
 	cfg *config.Config,
 	repos []string,
-	offsetRepos int,
 	limitRepos int,
 	idx map[string]*searcher.Searcher,
-	reposScanned *int,
-	filesOpened *int,
+	reposScanned *int64,
+	filesOpened *int64,
 	duration *int) (map[string]*index.SearchResponse, error) {
 
 	startedAt := time.Now()
@@ -80,32 +81,83 @@ func searchAll(
 
 	// use a buffered channel to avoid routine leaks on errs.
 	ch := make(chan *searchResponse, searchersNum)
-	// TODO: https://stackoverflow.com/questions/6807590/how-to-stop-a-goroutine
+	chRepos := make(chan string)
 	for _, repo := range repos {
-		go func(repo string) {
-			fms, err := idx[repo].Search(query, opts)
-			ch <- &searchResponse{repo, fms, err}
-		}(repo)
+		chRepos <- repo
+	}
+	close(chRepos)
+
+	// stop workers when we have enough results
+	quit := false
+
+	for i := 0; i < searchersNum; i++ {
+		go func() {
+			for repo := range chRepos {
+				fms, err := idx[repo].Search(query, opts)
+				r := &searchResponse{repo, fms, err}
+				atomic.AddInt64(filesOpened, int64(r.res.FilesOpened))
+				atomic.AddInt64(reposScanned, 1)
+				ch <- r
+				if quit {
+					return
+				}
+			}
+		}()
 	}
 
+	hasFindings := map[string]bool{}
 	res := map[string]*index.SearchResponse{}
+	var lastIndex int
 	for i := 0; i < n; i++ {
 		r := <-ch
 		if r.err != nil {
+			quit = true
 			return nil, r.err
 		}
 
 		if r.res.Matches == nil {
+			hasFindings[r.repo] = false
 			continue
 		}
-
+		hasFindings[r.repo] = true
 		res[r.repo] = r.res
-		*filesOpened += r.res.FilesOpened
+
+		lastIndex = enoughResults(repos, hasFindings, limitRepos)
+		if lastIndex != -1 {
+			break
+		}
+	}
+	// delete excess results
+	for i := lastIndex + 1; i < n; i++ {
+		repo := repos[i]
+		_, exists := res[repo]
+		if exists {
+			delete(res, repo)
+		}
 	}
 
 	*duration = int(time.Now().Sub(startedAt).Seconds() * 1000)
 
 	return res, nil
+}
+func enoughResults(repos []string, hasFindings map[string]bool, limitRepos int) int {
+	resNum := 0
+	var i int
+	var repo string
+	for i, repo = range repos {
+		has, processed := hasFindings[repo]
+		if !processed {
+			// Some of first repos are not processed
+			return -1
+		}
+		if has {
+			resNum++
+			if resNum >= limitRepos {
+				break
+			}
+		}
+	}
+	return i
 }
 
 // Used for parsing flags from form values.
@@ -114,7 +166,7 @@ func parseAsBool(v string) bool {
 	return v == "true" || v == "1" || v == "fosho"
 }
 
-func parseAsRepoList(v string, idx map[string]*searcher.Searcher) []string {
+func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos int) []string {
 	v = strings.TrimSpace(v)
 	var repos []string
 	if v == "" {
@@ -136,9 +188,15 @@ func parseAsRepoList(v string, idx map[string]*searcher.Searcher) []string {
 	}
 
 	re, _ := regexp.Compile(v)
+	num := 0
+	// TODO: keep repos order the same as in config
 	for repo := range idx {
 		if re.MatchString(repo, true, true) < 0 {
 			// repo doesn't pass regexp
+			continue
+		}
+		num++
+		if num <= offsetRepos {
 			continue
 		}
 		repos = append(repos, repo)
@@ -201,10 +259,10 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		var opt index.SearchOptions
 
 		stats := parseAsBool(r.FormValue("stats"))
-		repos := parseAsRepoList(r.FormValue("repos"), idx)
+		offsetRepos, limitRepos := parseRangeValue(r.FormValue("rngRepos"))
+		repos := parseAsRepoList(r.FormValue("repos"), idx, offsetRepos)
 		query := r.FormValue("q")
 		opt.Offset, opt.Limit = parseRangeValue(r.FormValue("rng"))
-		offsetRepos, limitRepos := parseRangeValue(r.FormValue("rngRepos"))
 		opt.FileRegexp = r.FormValue("files")
 		opt.ExcludeFileRegexp = r.FormValue("excludeFiles")
 		opt.IgnoreCase = parseAsBool(r.FormValue("i"))
@@ -214,11 +272,11 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 			maxLinesOfContext,
 			defaultLinesOfContext)
 
-		var filesOpened int
+		var filesOpened int64
 		var durationMs int
-		var reposScanned int
+		var reposScanned int64
 
-		results, err := searchAll(query, &opt, cfg, repos, offsetRepos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
+		results, err := searchAll(query, &opt, cfg, repos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
 		if err != nil {
 			// TODO(knorton): Return ok status because the UI expects it for now.
 			writeError(w, err, http.StatusOK)
@@ -233,8 +291,9 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		res.Results = results
 		if stats {
 			res.Stats = &Stats{
-				FilesOpened: filesOpened,
-				Duration:    durationMs,
+				FilesOpened:  filesOpened,
+				ReposScanned: reposScanned,
+				Duration:     durationMs,
 			}
 		}
 
@@ -257,7 +316,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 			return
 		}
 
-		repos := parseAsRepoList(r.FormValue("repos"), idx)
+		repos := parseAsRepoList(r.FormValue("repos"), idx, 0)
 
 		for _, repo := range repos {
 			searcher := idx[repo]
