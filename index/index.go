@@ -56,6 +56,12 @@ type Match struct {
 	After      []string
 }
 
+type SearchIndexResponse struct {
+	Files    []uint32
+	Re       *regexp.Regexp
+	Duration time.Duration
+	Found    bool
+}
 type SearchResponse struct {
 	Matches        []*FileMatch
 	FilesWithMatch int
@@ -140,7 +146,7 @@ func GetRegexpPattern(pat string, ignoreCase bool) string {
 	return "(?m)" + pat
 }
 
-func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) {
+func (n *Index) SearchIndex(pat string, opt *SearchOptions) (*SearchIndexResponse, error) {
 	startedAt := time.Now()
 
 	n.lck.RLock()
@@ -151,14 +157,7 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		return nil, err
 	}
 
-	var (
-		g                grepper
-		results          []*FileMatch
-		filesOpened      int
-		filesFound       int
-		filesCollected   int
-		matchesCollected int
-	)
+	files := n.idx.PostingQuery(index.RegexpQuery(re.Syntax))
 
 	var fre *regexp.Regexp
 	if opt.FileRegexp != "" {
@@ -176,11 +175,9 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		}
 	}
 
-	files := n.idx.PostingQuery(index.RegexpQuery(re.Syntax))
+	filesFiltered := files[:0]
 	for _, file := range files {
-		var matches []*Match
 		name := n.idx.Name(file)
-		hasMatch := false
 
 		// reject files that do not match the file pattern
 		if fre != nil && fre.MatchString(name, true, true) < 0 {
@@ -191,6 +188,35 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		if efre != nil && efre.MatchString(name, true, true) > 0 {
 			continue
 		}
+		filesFiltered = append(filesFiltered, file)
+	}
+
+	return &SearchIndexResponse{
+		Found:    len(filesFiltered) != 0,
+		Files:    filesFiltered,
+		Re:       re,
+		Duration: time.Now().Sub(startedAt),
+	}, nil
+
+}
+func (n *Index) SearchFiles(searched *SearchIndexResponse, opt *SearchOptions) (*SearchResponse, error) {
+	startedAt := time.Now()
+	re := searched.Re
+	files := searched.Files
+
+	var (
+		g                grepper
+		results          []*FileMatch
+		filesOpened      int
+		filesFound       int
+		filesCollected   int
+		matchesCollected int
+	)
+
+	for _, file := range files {
+		var matches []*Match
+		name := n.idx.Name(file)
+		hasMatch := false
 
 		filesOpened++
 		if err := g.grep2File(filepath.Join(n.Ref.dir, "raw", name), re, int(opt.LinesOfContext),
@@ -219,6 +245,7 @@ func (n *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 		}
 
 		if !hasMatch {
+			// TODO yelizariev: is it possible case?
 			continue
 		}
 

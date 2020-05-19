@@ -11,7 +11,7 @@ import (
 const (
 	defaultMsBetweenPoll          = 30000
 	defaultMaxConcurrentIndexers  = 2
-	defaultMaxConcurrentSearchers = 100
+	defaultMaxConcurrentSearchers = 1000
 	defaultMaxReposInFirstResult  = 10
 	defaultMaxReposInNextResult   = 30
 	defaultPushEnabled            = false
