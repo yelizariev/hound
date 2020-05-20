@@ -54,7 +54,12 @@ func TestSearch(t *testing.T) {
 	defer idx.Close()
 
 	// Make sure we can carry out a search
-	if _, err := idx.Search("5a1c0dac2d9b3ea4085b30dd14375c18eab993d5", &SearchOptions{}); err != nil {
+	opt := &SearchOptions{}
+	res, err := idx.SearchIndex("5a1c0dac2d9b3ea4085b30dd14375c18eab993d5", opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := idx.SearchFiles(res, opt); err != nil {
 		t.Fatal(err)
 	}
 }

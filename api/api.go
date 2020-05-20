@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/itpp-labs/hound/codesearch/regexp"
@@ -51,7 +51,12 @@ type searchIndexResult struct {
 	repo    string
 	res     *index.SearchIndexResponse
 	err     error
-	cleanup chan bool
+	cleanup waiter
+}
+type searchFilesResult struct {
+	repo string
+	res  *index.SearchResponse
+	err  error
 }
 
 func min(a, b int) int {
@@ -61,29 +66,54 @@ func min(a, b int) int {
 	return b
 }
 
-type limiter chan bool
+type waiter struct {
+	ch     chan bool
+	active bool
+}
+
+func makeWaiter() waiter {
+	return waiter{make(chan bool, 1), true}
+}
+func (w *waiter) Wait() {
+	<-w.ch
+}
+func (w *waiter) Do() {
+	if w.active {
+		w.active = false
+		w.ch <- true
+	}
+}
+
+type limiter struct {
+	ch     chan bool
+	active bool
+}
 
 func makeLimiter(n int) limiter {
-	l := limiter(make(chan bool, n))
-	// fill limiter with n boxes
-	for i := 0; i < n; i++ {
-		l <- true
+	return limiter{make(chan bool, n), true}
+}
+
+func (l *limiter) Acquire() bool {
+	wasActive := l.active
+	if wasActive {
+		// wait
+		l.ch <- true
 	}
-	return limiter(l)
+	if l.active {
+		return true
+	} else if wasActive {
+		l.Release()
+	}
+	return false
 }
 
-func (l limiter) Acquire() bool {
-	// take 1 box
-	_, ok := <-l
-	return ok
+func (l *limiter) Release() {
+	<-l.ch
 }
-
-func (l limiter) Release() {
-	// put 1 box back
-	l <- true
-}
-func (l limiter) Close() {
-	close(l)
+func (l *limiter) Close() {
+	l.active = false
+	// no need to close channel
+	// see https://stackoverflow.com/a/8593986/222675
 }
 
 /**
@@ -98,86 +128,121 @@ func searchAll(
 	idx map[string]*searcher.Searcher,
 	reposScanned *int,
 	filesOpened *int,
-	duration *int) (map[string]*index.SearchResponse, error) {
-
+	duration *int) (map[string]*index.SearchResponse, int, error) {
 	startedAt := time.Now()
 
 	n := len(repos)
 	searchersNum := min(n, cfg.MaxConcurrentSearchers)
+	// TODO: Syncronization scheme and the code in general looks a bit
+	// complicated. Can it be simplified somehow?
 	limiter := makeLimiter(searchersNum)
+	var wg sync.WaitGroup
+	defer limiter.Close()
 
 	// use a buffered channel to avoid routine leaks on errs.
-	ch := make(chan *searchIndexResult, searchersNum)
+	ch := make(chan *searchIndexResult, n)
 
 	for _, repo := range repos {
 		go func(repo string) {
 			if !limiter.Acquire() {
 				return
 			}
+			fmt.Println(repo, "SearchIndex")
+			wg.Add(1)
 			defer idx[repo].SearchCleanUp()
 			fms, err := idx[repo].SearchIndex(query, opts)
-			cleanup := make(chan bool, 1)
+			cleanup := makeWaiter()
 			r := &searchIndexResult{repo, fms, err, cleanup}
 			// send result
 			ch <- r
+			wg.Done()
 			// next worker can start the search
 			limiter.Release()
 			// wait
-			<-cleanup
+			fmt.Println(repo, "SearchIndex wait")
+			cleanup.Wait()
+			fmt.Println(repo, "SearchIndex wait END")
 
 		}(repo)
 	}
 
 	results := map[string]*searchIndexResult{}
 	defer func() {
-		for _, res := range results {
-			res.cleanup <- true
+		fmt.Println("wg.Wait", time.Now())
+		wg.Wait()
+		close(ch)
+		fmt.Println("range ch")
+		for r := range ch {
+			results[r.repo] = r
 		}
-		for _ = range ch {
+		for _, res := range results {
 			*reposScanned += 1
+			res.cleanup.Do()
 		}
 	}()
 	firstUndone := 0
 	resNum := 0
 	for i := 0; i < n; i++ {
+		fmt.Println("Getting SearchIndex...")
 		r := <-ch
-		*reposScanned += 1
+		fmt.Println("Getting SearchIndex...Done")
 		results[r.repo] = r
 		if r.err != nil {
-			limiter.Close()
-			return nil, r.err
+			return nil, 0, r.err
 		}
 		if !r.res.Found {
+			r.cleanup.Do()
 			continue
 		}
 		firstUndone, resNum = checkResults(repos, results, firstUndone)
 		if resNum >= limitRepos {
-			limiter.Close()
 			break
 		}
 	}
-	final := map[string]*index.SearchResponse{}
-
-	// Grep files
-	for i := 0; i < n; i++ {
+	limiter.Close()
+	// cleanup excess repos
+	fmt.Println("Cleanup excess repos", firstUndone, limitRepos, n)
+	for i := firstUndone; i < n; i++ {
 		repo := repos[i]
 		r, processed := results[repo]
 		if !processed {
-			break
+			continue
 		}
-		searchRes, err := idx[repo].SearchFiles(r.res, opts)
-		if err != nil {
-			return nil, err
+		r.cleanup.Do()
+	}
+
+	// Grep files
+	fmt.Println("Grep files")
+	final := map[string]*index.SearchResponse{}
+	chFiles := make(chan *searchFilesResult, firstUndone)
+	for i := 0; i < firstUndone; i++ {
+		repo := repos[i]
+		go func(repo string) {
+			r := results[repo]
+			fmt.Println(repo, "SearchFiles...")
+			searchRes, err := idx[repo].SearchFiles(r.res, opts)
+			chFiles <- &searchFilesResult{repo, searchRes, err}
+			fmt.Println(repo, "SearchFiles...DONE")
+		}(repo)
+	}
+	fmt.Println("Grep files - gather results")
+	for i := 0; i < firstUndone; i++ {
+		res := <-chFiles
+		if res.err != nil {
+			return nil, 0, res.err
 		}
-		// TODO: move to new place
+		repo := res.repo
+		searchRes := res.res
 		*filesOpened += searchRes.FilesOpened
 		final[repo] = searchRes
+		results[repo].cleanup.Do()
 
 	}
 
 	*duration = int(time.Now().Sub(startedAt).Seconds() * 1000)
 
-	return final, nil
+	fmt.Println("FINISH")
+	return final, firstUndone, nil
 }
 func checkResults(repos []string, results map[string]*searchIndexResult, firstUndone int) (int, int) {
 	resNum := 0
@@ -296,6 +361,9 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 
 		stats := parseAsBool(r.FormValue("stats"))
 		offsetRepos, limitRepos := parseRangeValue(r.FormValue("rngRepos"))
+		if limitRepos == 0 {
+			limitRepos = cfg.MaxReposInFirstResult
+		}
 		repos := parseAsRepoList(r.FormValue("repos"), idx, offsetRepos)
 		query := r.FormValue("q")
 		opt.Offset, opt.Limit = parseRangeValue(r.FormValue("rng"))
@@ -312,7 +380,8 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		var durationMs int
 		var reposScanned int
 
-		results, err := searchAll(query, &opt, cfg, repos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
+		results, nextOffsetRepos, err := searchAll(query, &opt, cfg, repos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
+		fmt.Println("searchAll quited")
 		if err != nil {
 			// TODO(knorton): Return ok status because the UI expects it for now.
 			writeError(w, err, http.StatusOK)
@@ -320,8 +389,10 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		}
 
 		var res struct {
-			Results map[string]*index.SearchResponse
-			Stats   *Stats `json:",omitempty"`
+			Results         map[string]*index.SearchResponse
+			Stats           *Stats `json:",omitempty"`
+			NextOffsetRepos int
+			NextLimitRepos  int
 		}
 
 		res.Results = results
@@ -332,6 +403,8 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 				Duration:     durationMs,
 			}
 		}
+		res.NextOffsetRepos = nextOffsetRepos
+		res.NextLimitRepos = cfg.MaxReposInNextResult
 
 		writeResp(w, &res)
 	})
