@@ -47,9 +47,9 @@ func writeError(w http.ResponseWriter, err error, status int) {
 	}, status)
 }
 
-type searchIndexResult struct {
+type preSearchResult struct {
 	repo    string
-	res     *index.SearchIndexResponse
+	res     *index.PreSearchResponse
 	err     error
 	cleanup waiter
 }
@@ -140,33 +140,33 @@ func searchAll(
 	defer limiter.Close()
 
 	// use a buffered channel to avoid routine leaks on errs.
-	ch := make(chan *searchIndexResult, n)
+	ch := make(chan *preSearchResult, n)
 
 	for _, repo := range repos {
 		go func(repo string) {
 			if !limiter.Acquire() {
 				return
 			}
-			fmt.Println(repo, "SearchIndex")
+			fmt.Println(repo, "PreSearch")
 			wg.Add(1)
 			defer idx[repo].SearchCleanUp()
-			fms, err := idx[repo].SearchIndex(query, opts)
+			fms, err := idx[repo].PreSearch(query, opts)
 			cleanup := makeWaiter()
-			r := &searchIndexResult{repo, fms, err, cleanup}
+			r := &preSearchResult{repo, fms, err, cleanup}
 			// send result
 			ch <- r
 			wg.Done()
 			// next worker can start the search
 			limiter.Release()
 			// wait
-			fmt.Println(repo, "SearchIndex wait")
+			fmt.Println(repo, "PreSearch wait")
 			cleanup.Wait()
-			fmt.Println(repo, "SearchIndex wait END")
+			fmt.Println(repo, "PreSearch wait END")
 
 		}(repo)
 	}
 
-	results := map[string]*searchIndexResult{}
+	results := map[string]*preSearchResult{}
 	defer func() {
 		fmt.Println("wg.Wait", time.Now())
 		wg.Wait()
@@ -183,9 +183,9 @@ func searchAll(
 	firstUndone := 0
 	resNum := 0
 	for i := 0; i < n; i++ {
-		fmt.Println("Getting SearchIndex...")
+		fmt.Println("Getting PreSearch...")
 		r := <-ch
-		fmt.Println("Getting SearchIndex...Done")
+		fmt.Println("Getting PreSearch...Done")
 		results[r.repo] = r
 		if r.err != nil {
 			return nil, 0, r.err
@@ -215,27 +215,40 @@ func searchAll(
 	fmt.Println("Grep files")
 	final := map[string]*index.SearchResponse{}
 	chFiles := make(chan *searchFilesResult, firstUndone)
+	resNumIndex := 0
 	for i := 0; i < firstUndone; i++ {
 		repo := repos[i]
-		go func(repo string) {
-			r := results[repo]
-			fmt.Println(repo, "SearchFiles...")
-			searchRes, err := idx[repo].SearchFiles(r.res, opts)
+		r := results[repo]
+		if !r.res.Found {
+			continue
+		}
+		resNumIndex++
+		go func(repo string, r *preSearchResult) {
+			fmt.Println(repo, "Search...")
+			searchRes, err := idx[repo].Search(r.res, opts)
 			chFiles <- &searchFilesResult{repo, searchRes, err}
-			fmt.Println(repo, "SearchFiles...DONE")
-		}(repo)
+			fmt.Println(repo, "Search...DONE")
+		}(repo, r)
 	}
 	fmt.Println("Grep files - gather results")
-	for i := 0; i < firstUndone; i++ {
+	resNumFiles := 0
+	for i := 0; i < resNumIndex; i++ {
 		res := <-chFiles
 		if res.err != nil {
 			return nil, 0, res.err
 		}
 		repo := res.repo
+		results[repo].cleanup.Do()
 		searchRes := res.res
+		if searchRes.Matches == nil {
+			continue
+		}
+		if resNumFiles >= limitRepos {
+			continue
+		}
+		resNumFiles++
 		*filesOpened += searchRes.FilesOpened
 		final[repo] = searchRes
-		results[repo].cleanup.Do()
 
 	}
 
@@ -244,7 +257,7 @@ func searchAll(
 	fmt.Println("FINISH")
 	return final, firstUndone, nil
 }
-func checkResults(repos []string, results map[string]*searchIndexResult, firstUndone int) (int, int) {
+func checkResults(repos []string, results map[string]*preSearchResult, firstUndone int) (int, int) {
 	resNum := 0
 	var i int
 	n := len(repos)

@@ -55,11 +55,11 @@ func TestSearch(t *testing.T) {
 
 	// Make sure we can carry out a search
 	opt := &SearchOptions{}
-	res, err := idx.SearchIndex("5a1c0dac2d9b3ea4085b30dd14375c18eab993d5", opt)
+	res, err := idx.PreSearch("5a1c0dac2d9b3ea4085b30dd14375c18eab993d5", opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := idx.SearchFiles(res, opt); err != nil {
+	if _, err := idx.Search(res, opt); err != nil {
 		t.Fatal(err)
 	}
 }
