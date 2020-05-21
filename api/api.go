@@ -27,6 +27,11 @@ type Stats struct {
 	ReposScanned int
 	Duration     int
 }
+type ReposPagination struct {
+	NextOffset int
+	OtherRepos int
+	NextLimit  int
+}
 
 func writeJson(w http.ResponseWriter, data interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
@@ -215,14 +220,19 @@ func searchAll(
 	fmt.Println("Grep files")
 	final := map[string]*index.SearchResponse{}
 	chFiles := make(chan *searchFilesResult, firstUndone)
-	resNumIndex := 0
+	foundNum := 0
+	var NextOffsetRepos int
 	for i := 0; i < firstUndone; i++ {
 		repo := repos[i]
 		r := results[repo]
 		if !r.res.Found {
 			continue
 		}
-		resNumIndex++
+		if foundNum >= limitRepos {
+			NextOffsetRepos = i
+			break
+		}
+		foundNum++
 		go func(repo string, r *preSearchResult) {
 			fmt.Println(repo, "Search...")
 			searchRes, err := idx[repo].Search(r.res, opts)
@@ -230,9 +240,10 @@ func searchAll(
 			fmt.Println(repo, "Search...DONE")
 		}(repo, r)
 	}
+
 	fmt.Println("Grep files - gather results")
-	resNumFiles := 0
-	for i := 0; i < resNumIndex; i++ {
+	finalNum := 0
+	for i := 0; i < foundNum; i++ {
 		res := <-chFiles
 		if res.err != nil {
 			return nil, 0, res.err
@@ -243,19 +254,15 @@ func searchAll(
 		if searchRes.Matches == nil {
 			continue
 		}
-		if resNumFiles >= limitRepos {
-			continue
-		}
-		resNumFiles++
+		finalNum++
 		*filesOpened += searchRes.FilesOpened
 		final[repo] = searchRes
-
 	}
 
 	*duration = int(time.Now().Sub(startedAt).Seconds() * 1000)
 
 	fmt.Println("FINISH")
-	return final, firstUndone, nil
+	return final, NextOffsetRepos, nil
 }
 func checkResults(repos []string, results map[string]*preSearchResult, firstUndone int) (int, int) {
 	resNum := 0
@@ -304,6 +311,7 @@ func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos in
 	re, _ := regexp.Compile(v)
 	num := 0
 	// TODO: keep repos order the same as in config
+	fmt.Println("parseAsRepoList", len(idx), v, offsetRepos)
 	for repo := range idx {
 		if re.MatchString(repo, true, true) < 0 {
 			// repo doesn't pass regexp
@@ -404,8 +412,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		var res struct {
 			Results         map[string]*index.SearchResponse
 			Stats           *Stats `json:",omitempty"`
-			NextOffsetRepos int
-			NextLimitRepos  int
+			ReposPagination *ReposPagination
 		}
 
 		res.Results = results
@@ -416,8 +423,11 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 				Duration:     durationMs,
 			}
 		}
-		res.NextOffsetRepos = nextOffsetRepos
-		res.NextLimitRepos = cfg.MaxReposInNextResult
+		res.ReposPagination = &ReposPagination{
+			NextOffset: offsetRepos + nextOffsetRepos,
+			NextLimit:  cfg.MaxReposInNextResult,
+			OtherRepos: len(repos) - nextOffsetRepos,
+		}
 
 		writeResp(w, &res)
 	})
