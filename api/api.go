@@ -147,11 +147,13 @@ func searchAll(
 	// use a buffered channel to avoid routine leaks on errs.
 	ch := make(chan *preSearchResult, n)
 
+	fmt.Println("searchAll", time.Now())
 	for _, repo := range repos {
 		go func(repo string) {
 			if !limiter.Acquire() {
 				return
 			}
+			startedAt = time.Now()
 			fmt.Println(repo, "PreSearch")
 			wg.Add(1)
 			defer idx[repo].SearchCleanUp()
@@ -164,7 +166,7 @@ func searchAll(
 			// next worker can start the search
 			limiter.Release()
 			// wait
-			fmt.Println(repo, "PreSearch wait")
+			fmt.Println(repo, "PreSearch wait", time.Now().Sub(startedAt).Seconds()*1000)
 			cleanup.Wait()
 			fmt.Println(repo, "PreSearch wait END")
 
@@ -190,7 +192,7 @@ func searchAll(
 	for i := 0; i < n; i++ {
 		fmt.Println("Getting PreSearch...")
 		r := <-ch
-		fmt.Println("Getting PreSearch...Done")
+		fmt.Println("Getting PreSearch...Done", r, r.res.Found)
 		results[r.repo] = r
 		if r.err != nil {
 			return nil, 0, r.err
@@ -222,24 +224,26 @@ func searchAll(
 	chFiles := make(chan *searchFilesResult, firstUndone)
 	foundNum := 0
 	var NextOffsetRepos int
-	for i := 0; i < firstUndone; i++ {
+	var i int
+	for i = 0; i < firstUndone; i++ {
 		repo := repos[i]
 		r := results[repo]
 		if !r.res.Found {
 			continue
 		}
 		if foundNum >= limitRepos {
-			NextOffsetRepos = i
 			break
 		}
 		foundNum++
 		go func(repo string, r *preSearchResult) {
 			fmt.Println(repo, "Search...")
+			startedAt = time.Now()
 			searchRes, err := idx[repo].Search(r.res, opts)
 			chFiles <- &searchFilesResult{repo, searchRes, err}
-			fmt.Println(repo, "Search...DONE")
+			fmt.Println(repo, "Search...DONE", time.Now().Sub(startedAt).Seconds()*1000)
 		}(repo, r)
 	}
+	NextOffsetRepos = i
 
 	fmt.Println("Grep files - gather results")
 	finalNum := 0
@@ -268,8 +272,10 @@ func checkResults(repos []string, results map[string]*preSearchResult, firstUndo
 	resNum := 0
 	var i int
 	n := len(repos)
-	for i := firstUndone; i < n; i++ {
+	fmt.Println("checkResults", repos, firstUndone)
+	for i = firstUndone; i < n; i++ {
 		r, processed := results[repos[i]]
+		fmt.Println("checkResults FOR: ", repos[i], processed, processed && r.res.Found)
 		if !processed {
 			// Some of first repos are not processed
 			return i, resNum

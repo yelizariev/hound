@@ -178,6 +178,7 @@ export const Model = {
 
         const params = {...this.params,
             rng: numLoaded+':'+endAt,
+            rngRepos: "0:1",
             repos: "^" + repo + "$"
         };
 
