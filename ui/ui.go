@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime"
+	"strings"
 	text_template "text/template"
 
 	"github.com/itpp-labs/hound/config"
@@ -96,6 +97,7 @@ func renderForDev(w io.Writer, root string, c *content, cfg *config.Config, r *h
 	if err != nil {
 		return err
 	}
+	initSearch = strings.ReplaceAll(initSearch, "&", "&amp;")
 
 	var buf bytes.Buffer
 	for _, path := range c.sources {
