@@ -1,12 +1,16 @@
 name: Release
 on:
   release:
-    types: [prereleased]
+    types: [prereleased, edited]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+    - name: Check that it's prerelease
+      if: github.event.release.prerelease == false
+      run: |
+        exit 1
     - name: Start deployment
       uses: bobheadxi/deployments@v0.2.0
       id: deployment
