@@ -3,20 +3,24 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"path/filepath"
 )
 
 const (
-	defaultMsBetweenPoll         = 30000
-	defaultMaxConcurrentIndexers = 2
-	defaultPushEnabled           = false
-	defaultPollEnabled           = true
-	defaultTitle                 = "Hound"
-	defaultVcs                   = "git"
-	defaultBaseUrl               = "{url}/blob/{rev}/{path}{anchor}"
-	defaultAnchor                = "#L{line}"
-	defaultHealthCheckURI        = "/healthz"
+	defaultMsBetweenPoll          = 30000
+	defaultMaxConcurrentIndexers  = 2
+	defaultMaxConcurrentSearchers = 1000
+	defaultMaxReposInFirstResult  = 10
+	defaultMaxReposInNextResult   = 30
+	defaultPushEnabled            = false
+	defaultPollEnabled            = true
+	defaultTitle                  = "Hound"
+	defaultVcs                    = "git"
+	defaultBaseUrl                = "{url}/blob/{rev}/{path}{anchor}"
+	defaultAnchor                 = "#L{line}"
+	defaultHealthCheckURI         = "/healthz"
 )
 
 type UrlPattern struct {
@@ -25,8 +29,8 @@ type UrlPattern struct {
 }
 
 type PatternLink struct {
-    Pattern string `json:"pattern"`
-    Link    string `json:"link"`
+	Pattern string `json:"pattern"`
+	Link    string `json:"link"`
 }
 
 type Repo struct {
@@ -61,12 +65,15 @@ func (r *Repo) PushUpdatesEnabled() bool {
 }
 
 type Config struct {
-	DbPath                string            `json:"dbpath"`
-	Title                 string            `json:"title"`
-	Repos                 map[string]*Repo  `json:"repos"`
-	MaxConcurrentIndexers int               `json:"max-concurrent-indexers"`
-	HealthCheckURI        string            `json:"health-check-uri"`
-	InitSearch            map[string]string `json:"init-search"`
+	DbPath                 string            `json:"dbpath"`
+	Title                  string            `json:"title"`
+	Repos                  map[string]*Repo  `json:"repos"`
+	MaxConcurrentIndexers  int               `json:"max-concurrent-indexers"`
+	MaxConcurrentSearchers int               `json:"max-concurrent-searchers"`
+	MaxReposInFirstResult  int               `json:"max-repos-in-first-result"`
+	MaxReposInNextResult   int               `json:"max-repos-in-next-result"`
+	HealthCheckURI         string            `json:"health-check-uri"`
+	InitSearch             map[string]string `json:"init-search"`
 }
 
 type ClientConfig struct {
@@ -132,6 +139,15 @@ func initConfig(c *Config) {
 	if c.MaxConcurrentIndexers == 0 {
 		c.MaxConcurrentIndexers = defaultMaxConcurrentIndexers
 	}
+	if c.MaxConcurrentSearchers == 0 {
+		c.MaxConcurrentSearchers = defaultMaxConcurrentSearchers
+	}
+	if c.MaxReposInFirstResult == 0 {
+		c.MaxReposInFirstResult = defaultMaxReposInFirstResult
+	}
+	if c.MaxReposInNextResult == 0 {
+		c.MaxReposInNextResult = defaultMaxReposInNextResult
+	}
 
 	if c.HealthCheckURI == "" {
 		c.HealthCheckURI = defaultHealthCheckURI
@@ -179,4 +195,26 @@ func (c *Config) ToJsonString() (string, error) {
 	}
 
 	return string(b), nil
+}
+func get(dict map[string]string, key, dflt string) string {
+	if value, ok := dict[key]; ok {
+		return value
+	}
+	return dflt
+}
+
+func (c *Config) ToOpenSearchParams() (string, error) {
+	// This must be the same as in App.jsx (see const initParams = ...)
+	// Exception is for InitSearch.q which is not used here
+	i := get(c.InitSearch, "i", "nope")
+	files := get(c.InitSearch, "files", "")
+	excludeFiles := get(c.InitSearch, "excludeFiles", "")
+	repos := get(c.InitSearch, "repos", ".*")
+	params := url.Values{}
+	params.Add("i", i)
+	params.Add("files", files)
+	params.Add("excludeFiles", excludeFiles)
+	params.Add("repos", repos)
+
+	return params.Encode(), nil
 }

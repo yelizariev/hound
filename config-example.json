@@ -1,5 +1,8 @@
 {
     "max-concurrent-indexers" : 2,
+    "max-concurrent-searchers" : 2,
+    "max-repos-in-first-result" : 10,
+    "max-repos-in-next-result" : 30,
     "dbpath" : "data",
     "title" : "Hound",
     "health-check-uri" : "/healthz",

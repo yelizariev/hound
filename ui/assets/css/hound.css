@@ -290,6 +290,15 @@ button:focus {
   height: 55px;
   vertical-align: top;
   width: 100%;
+  margin-bottom: 20px;
+}
+
+#result > .moar {
+    height: 75px;
+    vertical-align: top;
+    width: 100%;
+    margin-top: 25px;
+    border-radius: 9px;
 }
 
 .file {

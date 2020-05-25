@@ -19,6 +19,9 @@ export const Model = {
 
     didLoadMore: new Signal(),
 
+    willLoadOtherRepos: new Signal(),
+    didLoadOtherRepos: new Signal(),
+
     didError: new Signal(),
 
     didLoadRepos : new Signal(),
@@ -70,6 +73,37 @@ export const Model = {
         });
     },
 
+    processResults (matches, reset) {
+
+        const results = [];
+
+        for (let repo in matches) {
+            if (!matches[repo]) {
+                continue;
+            }
+
+            const res = matches[repo];
+            results.push({
+                Repo: repo,
+                Rev: res.Revision,
+                Matches: res.Matches,
+                FilesWithMatch: res.FilesWithMatch,
+            });
+        }
+
+        results.sort((a, b) => b.Matches.length - a.Matches.length || a.Repo.localeCompare(b.Repo));
+        if (reset) {
+            this.results = results;
+        } else {
+            this.results = this.results.concat(results);
+        }
+
+        const byRepo = this.results.reduce((obj, res) => (obj[res.Repo] = res, obj), {});
+
+        this.resultsByRepo = byRepo;
+
+    },
+
     Search (params) {
 
         const _this = this;
@@ -111,37 +145,20 @@ export const Model = {
                     return;
                 }
 
-                const matches = data.Results;
                 const stats = data.Stats;
-                const results = [];
+                const reposPagination = data.ReposPagination;
 
-                for (let repo in matches) {
-                    if (!matches[repo]) {
-                        continue;
-                    }
+                _this.processResults(data.Results, true);
 
-                    const res = matches[repo];
-                    results.push({
-                        Repo: repo,
-                        Rev: res.Revision,
-                        Matches: res.Matches,
-                        FilesWithMatch: res.FilesWithMatch,
-                    });
-                }
-
-                results.sort((a, b) => b.Matches.length - a.Matches.length || a.Repo.localeCompare(b.Repo));
-
-                const byRepo = results.reduce((obj, res) => (obj[res.Repo] = res, obj), {});
-
-                _this.results = results;
-                _this.resultsByRepo = byRepo;
                 _this.stats = {
                     Server: stats.Duration,
                     Total: Date.now() - startedAt,
+                    Repos: stats.ReposScanned,
                     Files: stats.FilesOpened
                 };
+                _this.reposPagination = reposPagination;
 
-                _this.didSearch.raise(_this, _this.results, _this.stats);
+                _this.didSearch.raise(_this, _this.results, _this.stats, _this.reposPagination);
             },
             error (xhr, status, err) {
                 _this.didError.raise(this, "The server broke down");
@@ -161,7 +178,8 @@ export const Model = {
 
         const params = {...this.params,
             rng: numLoaded+':'+endAt,
-            repos: repo
+            rngRepos: "0:1",
+            repos: "^" + repo + "$"
         };
 
         reqwest({
@@ -177,6 +195,35 @@ export const Model = {
                 const result = data.Results[repo];
                 results.Matches = results.Matches.concat(result.Matches);
                 _this.didLoadMore.raise(_this, repo, _this.results);
+            },
+            error (xhr, status, err) {
+                _this.didError.raise(this, "The server broke down");
+            }
+        });
+    },
+
+    LoadOtherRepos () {
+        const _this = this;
+
+        this.willLoadOtherRepos.raise(this);
+
+        const params = {...this.params,
+            rngRepos: this.reposPagination.NextOffset + ':' + this.reposPagination.NextLimit,
+        };
+
+        reqwest({
+            url: 'api/v1/search',
+            data: params,
+            type: 'json',
+            success (data) {
+                if (data.Error) {
+                    _this.didError.raise(_this, data.Error);
+                    return;
+                }
+
+                _this.processResults(data.Results);
+                _this.reposPagination = data.ReposPagination;
+                _this.didLoadOtherRepos.raise(_this, _this.results, _this.reposPagination);
             },
             error (xhr, status, err) {
                 _this.didError.raise(this, "The server broke down");

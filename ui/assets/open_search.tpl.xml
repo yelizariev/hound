@@ -6,5 +6,5 @@
     <Tags>Hound</Tags>
     <Url type="text/html"
          method="get"
-         template="http://{{ .Host }}/?q={searchTerms}" />
+         template="http://{{ .Host }}/?q={searchTerms}&amp;{{ .InitSearch }}" />
 </OpenSearchDescription>

@@ -174,6 +174,7 @@ export const SearchBar = (props) => {
                     <div className="val">{ FormatNumber(stats.Total) }ms total</div> /
                     <div className="val">{ FormatNumber(stats.Server) }ms server</div> /
                     <div className="val">{ stats.Files } files</div>
+                    <div className="val">{ stats.Repos } repos</div>
                 </div>
             </div>
         )

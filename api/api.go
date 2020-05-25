@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/itpp-labs/hound/codesearch/regexp"
@@ -22,8 +23,14 @@ const (
 )
 
 type Stats struct {
-	FilesOpened int
-	Duration    int
+	FilesOpened  int
+	ReposScanned int
+	Duration     int
+}
+type ReposPagination struct {
+	NextOffset int
+	OtherRepos int
+	NextLimit  int
 }
 
 func writeJson(w http.ResponseWriter, data interface{}, status int) {
@@ -45,54 +52,221 @@ func writeError(w http.ResponseWriter, err error, status int) {
 	}, status)
 }
 
-type searchResponse struct {
+type preSearchResult struct {
+	repo    string
+	res     *index.PreSearchResponse
+	err     error
+	cleanup waiter
+}
+type searchFilesResult struct {
 	repo string
 	res  *index.SearchResponse
 	err  error
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+type waiter struct {
+	ch     chan bool
+	active bool
+}
+
+func makeWaiter() waiter {
+	return waiter{make(chan bool, 1), true}
+}
+func (w *waiter) Wait() {
+	<-w.ch
+}
+func (w *waiter) Do() {
+	if w.active {
+		w.active = false
+		w.ch <- true
+	}
+}
+
+type limiter struct {
+	ch     chan bool
+	active bool
+}
+
+func makeLimiter(n int) limiter {
+	return limiter{make(chan bool, n), true}
+}
+
+func (l *limiter) Acquire() bool {
+	wasActive := l.active
+	if wasActive {
+		// wait
+		l.ch <- true
+	}
+	if l.active {
+		return true
+	} else if wasActive {
+		l.Release()
+	}
+	return false
+}
+
+func (l *limiter) Release() {
+	<-l.ch
+}
+func (l *limiter) Close() {
+	l.active = false
+	// no need to close channel
+	// see https://stackoverflow.com/a/8593986/222675
+}
+
 /**
- * Searches all repos in parallel.
+ * Searches all repos in parallel with respecting to max-concurrent-searchers param
  */
 func searchAll(
 	query string,
 	opts *index.SearchOptions,
+	cfg *config.Config,
 	repos []string,
+	limitRepos int,
 	idx map[string]*searcher.Searcher,
+	reposScanned *int,
 	filesOpened *int,
-	duration *int) (map[string]*index.SearchResponse, error) {
-
+	duration *int) (map[string]*index.SearchResponse, int, error) {
 	startedAt := time.Now()
 
 	n := len(repos)
+	searchersNum := min(n, cfg.MaxConcurrentSearchers)
+	// TODO: Syncronization scheme and the code in general looks a bit
+	// complicated. Can it be simplified somehow?
+	limiter := makeLimiter(searchersNum)
+	var wg sync.WaitGroup
+	defer limiter.Close()
 
 	// use a buffered channel to avoid routine leaks on errs.
-	ch := make(chan *searchResponse, n)
+	ch := make(chan *preSearchResult, n)
+
 	for _, repo := range repos {
 		go func(repo string) {
-			fms, err := idx[repo].Search(query, opts)
-			ch <- &searchResponse{repo, fms, err}
+			if !limiter.Acquire() {
+				return
+			}
+			wg.Add(1)
+			defer idx[repo].SearchCleanUp()
+			fms, err := idx[repo].PreSearch(query, opts)
+			cleanup := makeWaiter()
+			r := &preSearchResult{repo, fms, err, cleanup}
+			// send result
+			ch <- r
+			wg.Done()
+			// next worker can start the search
+			limiter.Release()
+			// wait
+			cleanup.Wait()
+
 		}(repo)
 	}
 
-	res := map[string]*index.SearchResponse{}
+	results := map[string]*preSearchResult{}
+	defer func() {
+		wg.Wait()
+		close(ch)
+		for r := range ch {
+			results[r.repo] = r
+		}
+		for _, res := range results {
+			*reposScanned += 1
+			res.cleanup.Do()
+		}
+	}()
+	firstUndone := 0
+	resNum := 0
 	for i := 0; i < n; i++ {
 		r := <-ch
+		results[r.repo] = r
 		if r.err != nil {
-			return nil, r.err
+			return nil, 0, r.err
 		}
-
-		if r.res.Matches == nil {
+		if !r.res.Found {
+			r.cleanup.Do()
 			continue
 		}
+		firstUndone, resNum = checkResults(repos, results, firstUndone)
+		if resNum >= limitRepos {
+			break
+		}
+	}
+	limiter.Close()
+	// cleanup excess repos
+	for i := firstUndone; i < n; i++ {
+		repo := repos[i]
+		r, processed := results[repo]
+		if !processed {
+			continue
+		}
+		r.cleanup.Do()
+	}
 
-		res[r.repo] = r.res
-		*filesOpened += r.res.FilesOpened
+	// Grep files
+	final := map[string]*index.SearchResponse{}
+	chFiles := make(chan *searchFilesResult, firstUndone)
+	foundNum := 0
+	var NextOffsetRepos int
+	var i int
+	for i = 0; i < firstUndone; i++ {
+		repo := repos[i]
+		r := results[repo]
+		if !r.res.Found {
+			continue
+		}
+		if foundNum >= limitRepos {
+			break
+		}
+		foundNum++
+		go func(repo string, r *preSearchResult) {
+			searchRes, err := idx[repo].Search(r.res, opts)
+			chFiles <- &searchFilesResult{repo, searchRes, err}
+		}(repo, r)
+	}
+	NextOffsetRepos = i
+
+	finalNum := 0
+	for i := 0; i < foundNum; i++ {
+		res := <-chFiles
+		if res.err != nil {
+			return nil, 0, res.err
+		}
+		repo := res.repo
+		results[repo].cleanup.Do()
+		searchRes := res.res
+		if searchRes.Matches == nil {
+			continue
+		}
+		finalNum++
+		*filesOpened += searchRes.FilesOpened
+		final[repo] = searchRes
 	}
 
 	*duration = int(time.Now().Sub(startedAt).Seconds() * 1000)
 
-	return res, nil
+	return final, NextOffsetRepos, nil
+}
+func checkResults(repos []string, results map[string]*preSearchResult, firstUndone int) (int, int) {
+	resNum := 0
+	var i int
+	n := len(repos)
+	for i = firstUndone; i < n; i++ {
+		r, processed := results[repos[i]]
+		if !processed {
+			// Some of first repos are not processed
+			return i, resNum
+		}
+		if r.res.Found {
+			resNum++
+		}
+	}
+	return i, resNum
 }
 
 // Used for parsing flags from form values.
@@ -101,7 +275,7 @@ func parseAsBool(v string) bool {
 	return v == "true" || v == "1" || v == "fosho"
 }
 
-func parseAsRepoList(v string, idx map[string]*searcher.Searcher) []string {
+func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos int) []string {
 	v = strings.TrimSpace(v)
 	var repos []string
 	if v == "" {
@@ -123,9 +297,15 @@ func parseAsRepoList(v string, idx map[string]*searcher.Searcher) []string {
 	}
 
 	re, _ := regexp.Compile(v)
+	num := 0
+	// TODO: keep repos order the same as in config
 	for repo := range idx {
 		if re.MatchString(repo, true, true) < 0 {
 			// repo doesn't pass regexp
+			continue
+		}
+		num++
+		if num <= offsetRepos {
 			continue
 		}
 		repos = append(repos, repo)
@@ -173,7 +353,7 @@ func parseRangeValue(rv string) (int, int) {
 	return b, e
 }
 
-func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
+func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Config) {
 
 	m.HandleFunc("/api/v1/repos", func(w http.ResponseWriter, r *http.Request) {
 		res := map[string]*config.Repo{}
@@ -188,7 +368,11 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 		var opt index.SearchOptions
 
 		stats := parseAsBool(r.FormValue("stats"))
-		repos := parseAsRepoList(r.FormValue("repos"), idx)
+		offsetRepos, limitRepos := parseRangeValue(r.FormValue("rngRepos"))
+		if limitRepos == 0 {
+			limitRepos = cfg.MaxReposInFirstResult
+		}
+		repos := parseAsRepoList(r.FormValue("repos"), idx, offsetRepos)
 		query := r.FormValue("q")
 		opt.Offset, opt.Limit = parseRangeValue(r.FormValue("rng"))
 		opt.FileRegexp = r.FormValue("files")
@@ -202,8 +386,9 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 
 		var filesOpened int
 		var durationMs int
+		var reposScanned int
 
-		results, err := searchAll(query, &opt, repos, idx, &filesOpened, &durationMs)
+		results, nextOffsetRepos, err := searchAll(query, &opt, cfg, repos, limitRepos, idx, &reposScanned, &filesOpened, &durationMs)
 		if err != nil {
 			// TODO(knorton): Return ok status because the UI expects it for now.
 			writeError(w, err, http.StatusOK)
@@ -211,16 +396,23 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 		}
 
 		var res struct {
-			Results map[string]*index.SearchResponse
-			Stats   *Stats `json:",omitempty"`
+			Results         map[string]*index.SearchResponse
+			Stats           *Stats `json:",omitempty"`
+			ReposPagination *ReposPagination
 		}
 
 		res.Results = results
 		if stats {
 			res.Stats = &Stats{
-				FilesOpened: filesOpened,
-				Duration:    durationMs,
+				FilesOpened:  filesOpened,
+				ReposScanned: reposScanned,
+				Duration:     durationMs,
 			}
+		}
+		res.ReposPagination = &ReposPagination{
+			NextOffset: offsetRepos + nextOffsetRepos,
+			NextLimit:  cfg.MaxReposInNextResult,
+			OtherRepos: len(repos) - nextOffsetRepos,
 		}
 
 		writeResp(w, &res)
@@ -242,7 +434,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher) {
 			return
 		}
 
-		repos := parseAsRepoList(r.FormValue("repos"), idx)
+		repos := parseAsRepoList(r.FormValue("repos"), idx, 0)
 
 		for _, repo := range repos {
 			searcher := idx[repo]
