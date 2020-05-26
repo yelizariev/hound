@@ -234,6 +234,7 @@ func newPrdHandler(cfg *config.Config) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	initSearch = strings.ReplaceAll(initSearch, "&", "&amp;")
 
 	return &prdHandler{
 		content:    contents,
