@@ -9,3 +9,4 @@ docker pull $DOCKER
 docker stop $NAME
 docker rm $NAME
 docker run -d -p 6080:6080 --name $NAME -v $DATA:/data $DOCKER
+docker image prune -f
