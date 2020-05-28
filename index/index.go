@@ -69,6 +69,7 @@ type SearchResponse struct {
 	FilesOpened    int           `json:"-"`
 	Duration       time.Duration `json:"-"`
 	Revision       string
+	Name           string
 }
 
 type FileMatch struct {
@@ -86,6 +87,7 @@ type IndexRef struct {
 	Rev  string
 	Time time.Time
 	dir  string
+	Name string
 }
 
 func (r *IndexRef) Dir() string {
@@ -295,6 +297,7 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 		FilesOpened:    filesOpened,
 		Duration:       time.Now().Sub(startedAt),
 		Revision:       n.Ref.Rev,
+		Name:           n.Ref.Name,
 	}, nil
 }
 
@@ -520,7 +523,7 @@ func Read(dir string) (*IndexRef, error) {
 	return m, nil
 }
 
-func Build(opt *IndexOptions, dst, src, url, rev string) (*IndexRef, error) {
+func Build(opt *IndexOptions, dst, src, url, name, rev string) (*IndexRef, error) {
 	if _, err := os.Stat(dst); err != nil {
 		if err := os.MkdirAll(dst, os.ModePerm); err != nil {
 			return nil, err
@@ -540,6 +543,7 @@ func Build(opt *IndexOptions, dst, src, url, rev string) (*IndexRef, error) {
 		Rev:  rev,
 		Time: time.Now(),
 		dir:  dst,
+		Name: name,
 	}
 
 	if err := r.writeManifest(); err != nil {

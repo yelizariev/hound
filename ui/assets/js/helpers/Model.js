@@ -77,21 +77,16 @@ export const Model = {
 
         const results = [];
 
-        for (let repo in matches) {
-            if (!matches[repo]) {
-                continue;
-            }
-
-            const res = matches[repo];
+        for (const res of matches) {
             results.push({
-                Repo: repo,
+                Repo: res.Name,
                 Rev: res.Revision,
                 Matches: res.Matches,
                 FilesWithMatch: res.FilesWithMatch,
             });
         }
-
-        results.sort((a, b) => b.Matches.length - a.Matches.length || a.Repo.localeCompare(b.Repo));
+        // TODO: do we need to order by matches count?
+        // results.sort((a, b) => b.Matches.length - a.Matches.length || a.Repo.localeCompare(b.Repo));
         if (reset) {
             this.results = results;
         } else {
@@ -192,7 +187,7 @@ export const Model = {
                     return;
                 }
 
-                const result = data.Results[repo];
+                const result = data.Results[0];
                 results.Matches = results.Matches.concat(result.Matches);
                 _this.didLoadMore.raise(_this, repo, _this.results);
             },
