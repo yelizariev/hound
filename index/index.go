@@ -239,19 +239,18 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 	re := searched.Re
 	files := searched.Files
 	filesOpened := searched.FilesOpened
-	// decrement to don't count file Number (offset + 1) twice
-	filesFound := searched.FilesFound - 1
 
 	var (
 		g                grepper
 		results          []*FileMatch
 		filesCollected   int
+		filesFound       int
 		matchesCollected int
 	)
 
 	for _, file := range files {
-		if opt.Limit > 0 && filesFound >= opt.Limit+opt.Offset+1 {
-			// Once we got (limit + offset + 1) confirmed finding,
+		if opt.Limit > 0 && filesFound >= opt.Limit+1 {
+			// Once we got (limit + 1) confirmed finding,
 			// we stop grepping and count the rest by Index result
 			// for sake of speed
 			filesFound++
