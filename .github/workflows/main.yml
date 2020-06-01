@@ -25,18 +25,6 @@ jobs:
         mkdir -p $(go env GOPATH)/src/github.com/itpp-labs/
         ln -s $(pwd) $(go env GOPATH)/src/github.com/itpp-labs/hound
         make
-    # Commiting updates from Github Actions doesn't trigger the action again, so
-    # next steps will not be executed twice
-    - uses: matheusalbino/git-commit@v1.0.1
-      name: Commit updates
-      with:
-        user-name: Marc Demo (from Github Actions)
-        user-email: i18n-bot@it-projects.info
-        message: |
-          :alien: rebuild bindata.go
-          
-          Sent from Github Actions (see .github/workflows/main.yml )
-        github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Build and publish DEV Docker Image
       uses: elgohr/Publish-Docker-Github-Action@master
       env:
@@ -54,3 +42,15 @@ jobs:
         registry: docker.pkg.github.com
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+    # Commiting updates from Github Actions doesn't trigger the action again, so
+    # next steps will not be executed twice
+    - uses: matheusalbino/git-commit@v1.0.1
+      name: Commit updates
+      with:
+        user-name: Marc Demo (from Github Actions)
+        user-email: i18n-bot@it-projects.info
+        message: |
+          :alien: rebuild bindata.go
+          
+          Sent from Github Actions (see .github/workflows/main.yml )
+        github-token: ${{ secrets.GITHUB_TOKEN }}
