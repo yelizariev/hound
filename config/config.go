@@ -34,6 +34,7 @@ type PatternLink struct {
 }
 
 type Repo struct {
+	Name              string         `json:"name"`
 	Url               string         `json:"url"`
 	MsBetweenPolls    int            `json:"ms-between-poll"`
 	Vcs               string         `json:"vcs"`
@@ -67,7 +68,7 @@ func (r *Repo) PushUpdatesEnabled() bool {
 type Config struct {
 	DbPath                 string            `json:"dbpath"`
 	Title                  string            `json:"title"`
-	Repos                  map[string]*Repo  `json:"repos"`
+	Repos                  []*Repo           `json:"repos"`
 	MaxConcurrentIndexers  int               `json:"max-concurrent-indexers"`
 	MaxConcurrentSearchers int               `json:"max-concurrent-searchers"`
 	MaxReposInFirstResult  int               `json:"max-repos-in-first-result"`

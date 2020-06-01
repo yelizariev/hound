@@ -77,7 +77,7 @@ export const App = function (props) {
             if ( urlParams.files !== files ) { setFiles(urlParams.files) }
             if ( urlParams.excludeFiles !== excludeFiles ) { setExcludeFiles(urlParams.excludeFiles) }
             if ( urlParams.repos !== reposRE ) {
-                setReposRE(urlParams.reposRE)
+                setReposRE(urlParams.repos)
                 setRepos([])
             }
             Model.Search(urlParams);
@@ -101,7 +101,7 @@ export const App = function (props) {
         if ( params.i !== ignoreCase ) { setIgnoreCase(params.i) }
         if ( params.files !== files ) { setFiles(params.files) }
         if ( params.excludeFiles !== excludeFiles ) { setExcludeFiles(params.excludeFiles) }
-        if ( params.repos !== reposRE ) { setReposRE(params.reposRE) }
+        if ( params.repos !== reposRE ) { setReposRE(params.repos) }
         setResults(null);
         setReposPagination(null);
         Model.Search(params);

@@ -24,7 +24,7 @@ export const FilesView = (props) => {
     const more = (matches.length < totalMatches)
         ? (
             <button className="moar" onClick={ onLoadMore }>
-                Load all {totalMatches} matches in { Model.NameForRepo(repo) }
+                Load all ~{totalMatches} matches in { Model.NameForRepo(repo) }
             </button>
         )
         : '';

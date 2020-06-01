@@ -59,6 +59,7 @@ type preSearchResult struct {
 	cleanup waiter
 }
 type searchFilesResult struct {
+	i    int
 	repo string
 	res  *index.SearchResponse
 	err  error
@@ -133,7 +134,7 @@ func searchAll(
 	idx map[string]*searcher.Searcher,
 	reposScanned *int,
 	filesOpened *int,
-	duration *int) (map[string]*index.SearchResponse, int, error) {
+	duration *int) ([]*index.SearchResponse, int, error) {
 	startedAt := time.Now()
 
 	n := len(repos)
@@ -209,7 +210,6 @@ func searchAll(
 	}
 
 	// Grep files
-	final := map[string]*index.SearchResponse{}
 	chFiles := make(chan *searchFilesResult, firstUndone)
 	foundNum := 0
 	var NextOffsetRepos int
@@ -223,15 +223,15 @@ func searchAll(
 		if foundNum >= limitRepos {
 			break
 		}
-		foundNum++
-		go func(repo string, r *preSearchResult) {
+		go func(repo string, r *preSearchResult, i int) {
 			searchRes, err := idx[repo].Search(r.res, opts)
-			chFiles <- &searchFilesResult{repo, searchRes, err}
-		}(repo, r)
+			chFiles <- &searchFilesResult{i, repo, searchRes, err}
+		}(repo, r, foundNum)
+		foundNum++
 	}
 	NextOffsetRepos = i
 
-	finalNum := 0
+	finalMap := map[int]*index.SearchResponse{}
 	for i := 0; i < foundNum; i++ {
 		res := <-chFiles
 		if res.err != nil {
@@ -243,9 +243,13 @@ func searchAll(
 		if searchRes.Matches == nil {
 			continue
 		}
-		finalNum++
 		*filesOpened += searchRes.FilesOpened
-		final[repo] = searchRes
+		finalMap[res.i] = searchRes
+	}
+
+	final := []*index.SearchResponse{}
+	for i := 0; i < foundNum; i++ {
+		final = append(final, finalMap[i])
 	}
 
 	*duration = int(time.Now().Sub(startedAt).Seconds() * 1000)
@@ -275,7 +279,7 @@ func parseAsBool(v string) bool {
 	return v == "true" || v == "1" || v == "fosho"
 }
 
-func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos int) []string {
+func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos int, orderedRepos []*config.Repo) []string {
 	v = strings.TrimSpace(v)
 	var repos []string
 	if v == "" {
@@ -298,9 +302,9 @@ func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos in
 
 	re, _ := regexp.Compile(v)
 	num := 0
-	// TODO: keep repos order the same as in config
-	for repo := range idx {
-		if re.MatchString(repo, true, true) < 0 {
+
+	for _, repo := range orderedRepos {
+		if re.MatchString(repo.Name, true, true) < 0 {
 			// repo doesn't pass regexp
 			continue
 		}
@@ -308,7 +312,7 @@ func parseAsRepoList(v string, idx map[string]*searcher.Searcher, offsetRepos in
 		if num <= offsetRepos {
 			continue
 		}
-		repos = append(repos, repo)
+		repos = append(repos, repo.Name)
 	}
 	return repos
 }
@@ -372,7 +376,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 		if limitRepos == 0 {
 			limitRepos = cfg.MaxReposInFirstResult
 		}
-		repos := parseAsRepoList(r.FormValue("repos"), idx, offsetRepos)
+		repos := parseAsRepoList(r.FormValue("repos"), idx, offsetRepos, cfg.Repos)
 		query := r.FormValue("q")
 		opt.Offset, opt.Limit = parseRangeValue(r.FormValue("rng"))
 		opt.FileRegexp = r.FormValue("files")
@@ -394,9 +398,8 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 			writeError(w, err, http.StatusOK)
 			return
 		}
-
 		var res struct {
-			Results         map[string]*index.SearchResponse
+			Results         []*index.SearchResponse
 			Stats           *Stats `json:",omitempty"`
 			ReposPagination *ReposPagination
 		}
@@ -434,7 +437,7 @@ func Setup(m *http.ServeMux, idx map[string]*searcher.Searcher, cfg *config.Conf
 			return
 		}
 
-		repos := parseAsRepoList(r.FormValue("repos"), idx, 0)
+		repos := parseAsRepoList(r.FormValue("repos"), idx, 0, cfg.Repos)
 
 		for _, repo := range repos {
 			searcher := idx[repo]

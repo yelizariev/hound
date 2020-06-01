@@ -62,6 +62,7 @@ type PreSearchResponse struct {
 	Duration    time.Duration
 	Found       bool
 	FilesOpened int
+	FilesFound  int
 }
 type SearchResponse struct {
 	Matches        []*FileMatch
@@ -69,6 +70,7 @@ type SearchResponse struct {
 	FilesOpened    int           `json:"-"`
 	Duration       time.Duration `json:"-"`
 	Revision       string
+	Name           string
 }
 
 type FileMatch struct {
@@ -86,6 +88,7 @@ type IndexRef struct {
 	Rev  string
 	Time time.Time
 	dir  string
+	Name string
 }
 
 func (r *IndexRef) Dir() string {
@@ -195,16 +198,16 @@ func (n *Index) PreSearch(pat string, opt *SearchOptions) (*PreSearchResponse, e
 	var filesOpened int
 	var g grepper
 	i := 0
-	found := false
-	// confirm finding by searching for first successfully grepped file
+	filesFound := 0
+	// confirm finding by searching for offset + 1 successfully grepped files
 	for _, file := range filesFiltered {
-		if !found {
+		if filesFound <= opt.Offset {
 			filesOpened++
 			name := n.idx.Name(file)
 			if err := g.grep2File(filepath.Join(n.Ref.dir, "raw", name), re, 0,
 				func(line []byte, lineno int, before [][]byte, after [][]byte) (bool, error) {
 
-					found = true
+					filesFound++
 					// false means "stop grepping"
 					return false, nil
 				}); err != nil {
@@ -212,11 +215,12 @@ func (n *Index) PreSearch(pat string, opt *SearchOptions) (*PreSearchResponse, e
 			}
 		}
 		// it's not the same as "else"
-		if found {
+		if filesFound > opt.Offset {
 			filesFiltered[i] = file
 			i++
 		}
 	}
+
 	// https://github.com/golang/go/wiki/SliceTricks#filter-in-place
 	filesFiltered = filesFiltered[:i]
 
@@ -226,6 +230,7 @@ func (n *Index) PreSearch(pat string, opt *SearchOptions) (*PreSearchResponse, e
 		Re:          re,
 		Duration:    time.Now().Sub(startedAt),
 		FilesOpened: filesOpened,
+		FilesFound:  filesFound,
 	}, nil
 
 }
@@ -234,16 +239,25 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 	re := searched.Re
 	files := searched.Files
 	filesOpened := searched.FilesOpened
+	// decrement to don't count file Number (offset + 1) twice
+	filesFound := searched.FilesFound - 1
 
 	var (
 		g                grepper
 		results          []*FileMatch
-		filesFound       int
 		filesCollected   int
 		matchesCollected int
 	)
 
 	for _, file := range files {
+		if opt.Limit > 0 && filesFound >= opt.Limit+opt.Offset+1 {
+			// Once we got (limit + offset + 1) confirmed finding,
+			// we stop grepping and count the rest by Index result
+			// for sake of speed
+			filesFound++
+			continue
+		}
+
 		var matches []*Match
 		name := n.idx.Name(file)
 		hasMatch := false
@@ -253,7 +267,7 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 			func(line []byte, lineno int, before [][]byte, after [][]byte) (bool, error) {
 
 				hasMatch = true
-				if filesFound < opt.Offset || (opt.Limit > 0 && filesCollected >= opt.Limit) {
+				if opt.Limit > 0 && filesCollected >= opt.Limit {
 					return false, nil
 				}
 
@@ -275,7 +289,6 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 		}
 
 		if !hasMatch {
-			// Why it actually happens? Algorithm optimization?
 			continue
 		}
 
@@ -295,6 +308,7 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 		FilesOpened:    filesOpened,
 		Duration:       time.Now().Sub(startedAt),
 		Revision:       n.Ref.Rev,
+		Name:           n.Ref.Name,
 	}, nil
 }
 
@@ -520,7 +534,7 @@ func Read(dir string) (*IndexRef, error) {
 	return m, nil
 }
 
-func Build(opt *IndexOptions, dst, src, url, rev string) (*IndexRef, error) {
+func Build(opt *IndexOptions, dst, src, url, name, rev string) (*IndexRef, error) {
 	if _, err := os.Stat(dst); err != nil {
 		if err := os.MkdirAll(dst, os.ModePerm); err != nil {
 			return nil, err
@@ -540,6 +554,7 @@ func Build(opt *IndexOptions, dst, src, url, rev string) (*IndexRef, error) {
 		Rev:  rev,
 		Time: time.Now(),
 		dir:  dst,
+		Name: name,
 	}
 
 	if err := r.writeManifest(); err != nil {

@@ -244,9 +244,10 @@ func buildAndOpenIndex(
 	vcsDir,
 	idxDir,
 	url,
+	name,
 	rev string) (*index.Index, error) {
 	if _, err := os.Stat(idxDir); err != nil {
-		r, err := index.Build(opt, idxDir, vcsDir, url, rev)
+		r, err := index.Build(opt, idxDir, vcsDir, url, name, rev)
 		if err != nil {
 			return nil, err
 		}
@@ -277,8 +278,8 @@ func hashFor(name string) string {
 }
 
 // Create a normalized name for the vcs directory of this repo.
-func vcsDirFor(name string, repo *config.Repo) string {
-	return fmt.Sprintf("vcs-%s", hashFor(name+repo.Url))
+func vcsDirFor(repo *config.Repo) string {
+	return fmt.Sprintf("vcs-%s", hashFor(repo.Name+repo.Url))
 }
 
 func init() {
@@ -307,8 +308,8 @@ func MakeAll(cfg *config.Config) (map[string]*Searcher, map[string]error, error)
 
 	// Start new searchers for all repos in different go routines while
 	// respecting cfg.MaxConcurrentIndexers.
-	for name, repo := range cfg.Repos {
-		go newSearcherConcurrent(cfg.DbPath, name, repo, refs, lim, resultCh)
+	for _, repo := range cfg.Repos {
+		go newSearcherConcurrent(cfg.DbPath, repo, refs, lim, resultCh)
 	}
 
 	// Collect the results on resultCh channel for all repos.
@@ -336,8 +337,8 @@ func MakeAll(cfg *config.Config) (map[string]*Searcher, map[string]error, error)
 
 // Creates a new Searcher that is available for searches as soon as this returns.
 // This will pull or clone the target repo and start watching the repo for changes.
-func New(dbpath, name string, repo *config.Repo) (*Searcher, error) {
-	s, err := newSearcher(dbpath, name, repo, &foundRefs{}, makeLimiter(1))
+func New(dbpath string, repo *config.Repo) (*Searcher, error) {
+	s, err := newSearcher(dbpath, repo, &foundRefs{}, makeLimiter(1))
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +382,7 @@ func updateAndReindex(
 		vcsDir,
 		nextIndexDir(dbpath),
 		repo.Url,
+		repo.Name,
 		newRev)
 	if err != nil {
 		log.Printf("failed index build (%s): %s", name, err)
@@ -401,14 +403,14 @@ func updateAndReindex(
 // Creates a new Searcher that is capable of re-claiming an existing index directory
 // from a set of existing manifests.
 func newSearcher(
-	dbpath, name string,
+	dbpath string,
 	repo *config.Repo,
 	refs *foundRefs,
 	lim limiter) (*Searcher, error) {
 
-	vcsDir := filepath.Join(dbpath, vcsDirFor(name, repo))
+	vcsDir := filepath.Join(dbpath, vcsDirFor(repo))
 
-	log.Printf("Searcher started for %s", name)
+	log.Printf("Searcher started for %s", repo.Name)
 
 	wd, err := vcs.New(repo.Vcs, repo.VcsConfig())
 	if err != nil {
@@ -440,6 +442,7 @@ func newSearcher(
 		vcsDir,
 		idxDir,
 		repo.Url,
+		repo.Name,
 		rev)
 	if err != nil {
 		return nil, err
@@ -479,7 +482,7 @@ func newSearcher(
 			}
 
 			// attempt to update and reindex this searcher
-			newRev, ok := updateAndReindex(s, dbpath, vcsDir, name, rev, wd, opt, lim)
+			newRev, ok := updateAndReindex(s, dbpath, vcsDir, repo.Name, rev, wd, opt, lim)
 			if !ok {
 				continue
 			}
@@ -503,7 +506,7 @@ func newSearcher(
 // It respects the parameter `cfg.MaxConcurrentIndexers` while making the
 // creation of searchers for various repositories concurrent.
 func newSearcherConcurrent(
-	dbpath, name string,
+	dbpath string,
 	repo *config.Repo,
 	refs *foundRefs,
 	lim limiter,
@@ -513,17 +516,17 @@ func newSearcherConcurrent(
 	lim.Acquire()
 	defer lim.Release()
 
-	s, err := newSearcher(dbpath, name, repo, refs, lim)
+	s, err := newSearcher(dbpath, repo, refs, lim)
 	if err != nil {
 		resultCh <- searcherResult{
-			name: name,
+			name: repo.Name,
 			err:  err,
 		}
 		return
 	}
 
 	resultCh <- searcherResult{
-		name:     name,
+		name:     repo.Name,
 		searcher: s,
 	}
 }

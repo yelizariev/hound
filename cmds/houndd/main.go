@@ -44,9 +44,15 @@ func makeSearchers(cfg *config.Config) (map[string]*searcher.Searcher, bool, err
 	if len(errs) > 0 {
 		// NOTE: This mutates the original config so the repos
 		// are not even seen by other code paths.
-		for name, _ := range errs {
-			delete(cfg.Repos, name)
+		n := 0
+		for _, repo := range cfg.Repos {
+			_, has_error := errs[repo.Name]
+			if !has_error {
+				cfg.Repos[n] = repo
+				n++
+			}
 		}
+		cfg.Repos = cfg.Repos[:n]
 
 		return searchers, false, nil
 	}
