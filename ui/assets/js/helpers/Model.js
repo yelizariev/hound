@@ -189,6 +189,7 @@ export const Model = {
 
                 const result = data.Results[0];
                 results.Matches = results.Matches.concat(result.Matches);
+                results.FilesWithMatch = result.FilesWithMatch;
                 _this.didLoadMore.raise(_this, repo, _this.results);
             },
             error (xhr, status, err) {
