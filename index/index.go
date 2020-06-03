@@ -262,6 +262,7 @@ func (n *Index) Search(searched *PreSearchResponse, opt *SearchOptions) (*Search
 		hasMatch := false
 
 		filesOpened++
+
 		if err := g.grep2File(filepath.Join(n.Ref.dir, "raw", name), re, int(opt.LinesOfContext),
 			func(line []byte, lineno int, before [][]byte, after [][]byte) (bool, error) {
 
