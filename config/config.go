@@ -1,11 +1,13 @@
 package config
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
@@ -68,6 +70,7 @@ func (r *Repo) PushUpdatesEnabled() bool {
 type Config struct {
 	DbPath                 string            `json:"dbpath"`
 	Title                  string            `json:"title"`
+	Favicon                *Favicon          `json:"favicon"`
 	Repos                  []*Repo           `json:"repos"`
 	MaxConcurrentIndexers  int               `json:"max-concurrent-indexers"`
 	MaxConcurrentSearchers int               `json:"max-concurrent-searchers"`
@@ -75,6 +78,25 @@ type Config struct {
 	MaxReposInNextResult   int               `json:"max-repos-in-next-result"`
 	HealthCheckURI         string            `json:"health-check-uri"`
 	InitSearch             map[string]string `json:"init-search"`
+}
+
+type Favicon struct {
+	Image   []byte
+	ModTime time.Time
+}
+
+func (f *Favicon) UnmarshalJSON(b []byte) error {
+	if b == nil {
+		return errors.New("Favicon: UnmarshalJSON on nil pointer")
+	}
+	unquoted := string(b[1 : len(b)-2])
+	data, err := base64.RawStdEncoding.DecodeString(unquoted)
+	if err != nil {
+		panic(err)
+	}
+	f.Image = append(((*f).Image)[0:0], data...)
+	f.ModTime = time.Now()
+	return nil
 }
 
 type ClientConfig struct {

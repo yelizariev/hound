@@ -52,6 +52,9 @@ func (h *devHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// See if we have templated content for this path
 	cr := h.content[p]
 	if cr == nil {
+		if serveFavicon(p, h.cfg.Favicon, w, r) {
+			return
+		}
 		// if not, serve up files
 		h.Handler.ServeHTTP(w, r)
 		return
@@ -62,6 +65,14 @@ func (h *devHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := renderForDev(w, h.root, cr, h.cfg, r); err != nil {
 		log.Panic(err)
 	}
+}
+
+func serveFavicon(path string, fav *config.Favicon, w http.ResponseWriter, r *http.Request) bool {
+	if path == "/favicon.ico" && fav != nil {
+		http.ServeContent(w, r, "favicon.ico", fav.ModTime, bytes.NewReader(fav.Image))
+		return true
+	}
+	return false
 }
 
 // Renders a templated asset in dev-mode. This simply embeds external script tags
@@ -142,6 +153,9 @@ func (h *prdHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err := renderForPrd(w, ct, h.cfg, h.cfgJson, h.initSearch, r); err != nil {
 			log.Panic(err)
 		}
+		return
+	}
+	if serveFavicon(p, h.cfg.Favicon, w, r) {
 		return
 	}
 
