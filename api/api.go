@@ -198,6 +198,9 @@ func searchAll(
 			break
 		}
 	}
+	if resNum < limitRepos {
+		firstUndone, resNum = checkResults(repos, results, firstUndone)
+	}
 	limiter.Close()
 	// cleanup excess repos
 	for i := firstUndone; i < n; i++ {
