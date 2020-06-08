@@ -15,7 +15,7 @@ export class File extends React.Component {
         this.setState({'showContent': to_open})
     }
     toggleContent() {
-        console.log('toggleContent')
+        // console.log('toggleContent')
         this.setState({'showContent': !this.state.showContent})
     }
     copyFilepath(evt) {

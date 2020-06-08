@@ -53,7 +53,7 @@ export const SearchBar = (props) => {
     };
 
     const elementChanged = (prop, evt) => {
-        console.log('elementChanged', prop, evt.currentTarget.value);
+        // console.log('elementChanged', prop, evt.currentTarget.value);
         switch (prop) {
             case 'query':
                 setSearchQuery(evt.currentTarget.value);
