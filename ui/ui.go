@@ -108,7 +108,7 @@ func renderForDev(w io.Writer, root string, c *content, cfg *config.Config, r *h
 	if err != nil {
 		return err
 	}
-	initSearch = strings.ReplaceAll(initSearch, "&", "&amp;")
+	initSearch = strings.Replace(initSearch, "&", "&amp;", -1)
 
 	var buf bytes.Buffer
 	for _, path := range c.sources {
@@ -248,7 +248,7 @@ func newPrdHandler(cfg *config.Config) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	initSearch = strings.ReplaceAll(initSearch, "&", "&amp;")
+	initSearch = strings.Replace(initSearch, "&", "&amp;", -1)
 
 	return &prdHandler{
 		content:    contents,
