@@ -63,7 +63,6 @@ export const ResultView = (props) => {
 
     const onLoadOtherRepos = () => Model.LoadOtherRepos();
 
-    console.log("reposPagination", reposPagination)
     const loadOtherRepos = reposPagination && reposPagination.OtherRepos > 1 ? (
         <button className="moar" onClick={ onLoadOtherRepos }>
           Search more results in { reposPagination.OtherRepos } repositories

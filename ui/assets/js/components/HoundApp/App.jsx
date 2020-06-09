@@ -47,7 +47,6 @@ export const App = function (props) {
         });
 
         Model.didSearch.tap((model, results, stats, reposPagination) => {
-            console.log("didSearch", reposPagination)
             setStats(stats);
             setResults(results);
             setReposPagination(reposPagination);
