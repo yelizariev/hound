@@ -6,6 +6,13 @@ export const ExpandVars = (template, values) => {
 };
 
 export const UrlToRepo = (repo, path, line, rev) => {
+    if (!repo){
+        // panic
+        setTimeout(function(){
+            document.body.innerHTML = '<h1 style="text-align:center">Something went wrong. Try to refresh page.</h1>';
+        }, 100);
+        throw("repo is undefined");
+    }
     let url = repo.url.replace(/\.git$/, '');
     const pattern = repo['url-pattern'];
     const filename = path.substring(path.lastIndexOf('/') + 1);
