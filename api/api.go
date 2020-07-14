@@ -139,21 +139,46 @@ func searchAll(
 
 	n := len(repos)
 	searchersNum := min(n, cfg.MaxConcurrentSearchers)
-	// TODO: Syncronization scheme and the code in general looks a bit
-	// complicated. Can it be simplified somehow?
 	limiter := makeLimiter(searchersNum)
-	var wg sync.WaitGroup
-	defer limiter.Close()
 
 	// use a buffered channel to avoid routine leaks on errs.
 	ch := make(chan *preSearchResult, n)
-
-	for _, repo := range repos {
-		go func(repo string) {
-			if !limiter.Acquire() {
+	enoughResults := makeWaiter()
+	var err error
+	firstUndone := 0
+	results := map[string]*preSearchResult{}
+	go func() {
+		defer limiter.Close()
+		defer enoughResults.Do()
+		resNum := 0
+		for i := 0; i < n; i++ {
+			r := <-ch
+			results[r.repo] = r
+			if r.err != nil {
+				err = r.err
 				return
 			}
-			wg.Add(1)
+			if !r.res.Found {
+				r.cleanup.Do()
+				continue
+			}
+			firstUndone, resNum = checkResults(repos, results, firstUndone)
+			if resNum >= limitRepos {
+				break
+			}
+		}
+		if resNum < limitRepos {
+			firstUndone, resNum = checkResults(repos, results, firstUndone)
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for _, repo := range repos {
+		if !limiter.Acquire() {
+			break
+		}
+		wg.Add(1)
+		go func(repo string) {
 			defer idx[repo].SearchCleanUp()
 			fms, err := idx[repo].PreSearch(query, opts)
 			cleanup := makeWaiter()
@@ -161,15 +186,27 @@ func searchAll(
 			// send result
 			ch <- r
 			wg.Done()
-			// next worker can start the search
+			// next worker can make PreSearch
 			limiter.Release()
-			// wait
+			// wait before calling SearchCleanUp
 			cleanup.Wait()
-
 		}(repo)
 	}
+	enoughResults.Wait()
+	if err != nil {
+		return nil, 0, err
+	}
 
-	results := map[string]*preSearchResult{}
+	// cleanup excess repos right now
+	for i := firstUndone; i < n; i++ {
+		repo := repos[i]
+		r, processed := results[repo]
+		if !processed {
+			continue
+		}
+		r.cleanup.Do()
+	}
+	// cleanup other repos at the end
 	defer func() {
 		wg.Wait()
 		close(ch)
@@ -181,36 +218,6 @@ func searchAll(
 			res.cleanup.Do()
 		}
 	}()
-	firstUndone := 0
-	resNum := 0
-	for i := 0; i < n; i++ {
-		r := <-ch
-		results[r.repo] = r
-		if r.err != nil {
-			return nil, 0, r.err
-		}
-		if !r.res.Found {
-			r.cleanup.Do()
-			continue
-		}
-		firstUndone, resNum = checkResults(repos, results, firstUndone)
-		if resNum >= limitRepos {
-			break
-		}
-	}
-	if resNum < limitRepos {
-		firstUndone, resNum = checkResults(repos, results, firstUndone)
-	}
-	limiter.Close()
-	// cleanup excess repos
-	for i := firstUndone; i < n; i++ {
-		repo := repos[i]
-		r, processed := results[repo]
-		if !processed {
-			continue
-		}
-		r.cleanup.Do()
-	}
 
 	// Grep files
 	chFiles := make(chan *searchFilesResult, firstUndone)
